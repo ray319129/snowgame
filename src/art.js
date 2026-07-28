@@ -380,33 +380,33 @@ A.padPost = px(22, [
 ]);
 
 // ---------- 升級圖示 12x12 ----------
-A.icoCap = px(12, [   // 背包
-  '...KKKKKK...',
-  '..KbBBBBbK..',
-  '.KbBbbbbBbK.',
-  'KbBbbbbbbBbK',
-  'KbBbbbbbbBbK',
-  'KbBKKKKKKBbK',
-  'KbBKGGGGKBbK',
-  'KbBKGGGGKBbK',
-  'KbBKKKKKKBbK',
-  'KbBbbbbbbBbK',
-  '.KBBBBBBBBK.',
+A.icoCap = px(12, [   // 背包（提把 + 翻蓋 + 前袋銅扣）
+  '....KKKK....',
+  '...KvBBvK...',
+  '..KKKKKKKK..',
+  '.KQqqqqqqQK.',
+  'KQqqqqqqqqQK',
+  'KQqqvvvvqqQK',
+  'KQqKKKKKKqQK',
+  'KQqKqqqqKqQK',
+  'KQqKvKKvKqQK',
+  'KQqKqqqqKqQK',
+  '.KQKKKKKKQK.',
   '..KKKKKKKK..',
 ]);
-A.icoSpeed = px(12, [ // 靴子 + 速度線
-  '............',
-  '.....KKKK...',
-  '....KpPPpK..',
-  '.KK.KpPPpK..',
-  'K...KpPPpK..',
-  '.KKK KpPPpK.',
-  '....KpPPPpK.',
-  '.KK.KpPPPPK.',
-  'K...KpPPPPPK',
-  '.KKKbbbbbbbK',
-  '...KBBBBBBBK',
-  '...KKKKKKKKK',
+A.icoSpeed = px(12, [ // 登山靴：L 形剪影 + 亮色鞋底（深色鞋底在小圖上會糊掉）
+  '...KKKK.....',
+  '..KqqqqK....',
+  '..KqvvqK....',
+  '..KqqqqK....',
+  '..KqqqqK....',
+  '..KqqqqK....',
+  '..KqqqqqK...',
+  '..KqqqqqqK..',
+  '..KqqqqqqqK.',
+  '..KqqqqqqqqK',
+  '.KvvvvvvvvvK',
+  '.KKKKKKKKKKK',
 ]);
 A.icoPower = px(12, [ // 火把
   '....y.......',
@@ -656,106 +656,63 @@ A.counter = px(26, [
 ]);
 
 //  箭塔四階：木哨塔 → 石塔 → 鐵弩塔 → 極光塔
-A.towers = [
-  px(16, [                       // LV1 木哨塔
-    '................',
-    '................',
-    '................',
-    '.....KKKK.......',
-    '....KwwwwK......',
-    '...KwWWWWwK.....',
-    '...KwKKKKwK.....',
-    '...KwKiiKwK.....',
-    '...KWKKKKWK.....',
-    '...KwwwwwwK.....',
-    '....KWWWWK......',
-    '.....KwWK.......',
-    '.....KwWK.......',
-    '.....KwWK.......',
-    '....KwWWwK......',
-    '....KwwwwK......',
-    '...KWWWWWWK.....',
-    '...KKKKKKKK.....',
-  ]),
-  px(18, [                       // LV2 石塔
-    '..................',
-    '......KKKK........',
-    '.....KhhhhK.......',
-    '....KzhzzhzK......',
-    '...KzhzzzzhzK.....',
-    '...KzhKKKKhzK.....',
-    '...KzhKiiKhzK.....',
-    '...KzZKiiKZzK.....',
-    '...KzZKKKKZzK.....',
-    '...KzZZZZZZzK.....',
-    '....KZZZZZZK......',
-    '.....KzZZzK.......',
-    '.....KzZZzK.......',
-    '.....KzZZzK.......',
-    '....KzzZZzzK......',
-    '....KzzzzzzK......',
-    '...KZZZZZZZZK.....',
-    '...KKKKKKKKKK.....',
-  ]),
-  px(20, [                       // LV3 鐵弩塔
-    '.........KK.........',
-    '........KyyK........',
-    '.......KKKKKK.......',
-    '....KKhhhhhhhhKK....',
-    '...KzhhzzzzzzhhzK...',
-    '...KzhzKKKKKKzhzK...',
-    '..KIzhzKiiiiKzhzIK..',
-    '..KIzZzKiIIiKzZzIK..',
-    '..KIzZzKiiiiKzZzIK..',
-    '...KzZZKKKKKKZZzK...',
-    '...KzZZZZZZZZZZzK...',
-    '....KZZZZZZZZZZK....',
-    '.....KzZiiiiZzK.....',
-    '.....KzZIIIIZzK.....',
-    '.....KzZZZZZZzK.....',
-    '....KzzzzzzzzzzK....',
-    '...KZZZZZZZZZZZZK...',
-    '...KKKKKKKKKKKKKK...',
-  ]),
-  px(22, [                       // LV4 極光塔
-    '..........KK..........',
-    '.........KccK.........',
-    '........KcCCcK........',
-    '.......KcCyyCcK.......',
-    '.....KKKcCyyCcKKK.....',
-    '....KIhhcCCCCchhIK....',
-    '...KIzhhKKKKKKhhzIK...',
-    '...KIzhKcccccKhzIK....',
-    '..KIczhKcCCCcKhzcIK...',
-    '..KIczhKcCCCcKhzcIK...',
-    '..KIczZKcccccKZzcIK...',
-    '...KzZZKKKKKKKZZzK....',
-    '...KzZZZZZZZZZZZzK....',
-    '....KcZZZZZZZZZcK.....',
-    '.....KcCZZZZZCcK......',
-    '.....KzZcccccZzK......',
-    '....KzzZZZZZZZzzK.....',
-    '...KZZZZZZZZZZZZZK....',
-    '...KKKKKKKKKKKKKKK....',
-  ]),
-];
+//  四階共用同一個剪影（高腳架 + 中央梯子 + 平台欄杆），只換材質與頂飾，
+//  所以升級時「還是我的塔，但變強了」一眼看得出來。塔刻意做得比人高很多。
+function watchtower(tier) {
+  //  每階 [主色, 暗面]。鐵塔刻意用深色當主色 —— 夾在亮灰石塔與發光極光塔
+  //  之間，剪影明暗才拉得開，遠遠就看得出自己升到第幾階。
+  const [L, D] = [['w', 'W'], ['z', 'Z'], ['i', 'I'], ['c', 'C']][tier];
+  const W = 26, H = 38;
+  return shape(W, H, ({ rect }) => {
+    // ---- 頂飾：每一階都不同，遠遠就看得出等級 ----
+    if (tier === 1) {                                   // 石塔：旗
+      rect(12, 0, 2, 6, 'W'); rect(14, 1, 6, 3, 'm'); rect(14, 3, 6, 1, 'M');
+    } else if (tier === 2) {                            // 鐵弩塔：弩臂
+      rect(12, 0, 2, 5, 'i');
+      rect(4, 3, 18, 1, 'I'); rect(3, 1, 1, 4, 'I'); rect(22, 1, 1, 4, 'I');
+    } else if (tier === 3) {                            // 極光塔：懸浮晶體
+      rect(12, 0, 2, 6, 'c'); rect(11, 1, 4, 4, 'C'); rect(12, 2, 2, 2, 'y');
+    }
+
+    // ---- 平台欄杆 ----
+    rect(1, 5, 24, 2, L);
+    for (let x = 2; x < 24; x += 4) rect(x, 7, 2, 3, D);
+
+    // ---- 甲板 ----
+    rect(0, 10, 26, 2, L);
+    rect(0, 12, 26, 2, D);
+
+    // ---- 腳架（往下外八）+ 中央梯子 + 交叉橫撐 ----
+    for (let i = 0; i < 20; i++) {
+      const y = 14 + i;
+      const s = Math.floor(i / 5);
+      rect(5 - s, y, 2, 1, L);  rect(7 - s, y, 1, 1, D);
+      rect(18 + s, y, 2, 1, L); rect(20 + s, y, 1, 1, D);
+      if (i % 3 === 1) rect(11, y, 4, 1, L);            // 梯子橫木
+      else { rect(11, y, 1, 1, L); rect(14, y, 1, 1, L); }
+      if (i === 6 || i === 14) rect(6 - s, y, 14 + s * 2, 1, D);
+    }
+
+    // ---- 石基座 ----
+    rect(1, 34, 5, 3, 'z');  rect(1, 36, 5, 1, 'Z');
+    rect(20, 34, 5, 3, 'z'); rect(20, 36, 5, 1, 'Z');
+  });
+}
+A.towers = [watchtower(0), watchtower(1), watchtower(2), watchtower(3)];
 A.tower = A.towers[0];
 
-//  圍牆柱（會沿著營地邊界排列）
-A.wallPost = px(12, [
-  '..KKKKKKKK..',
-  '.KffffffffK.',
-  'KwWwWwWwWwWK',
-  'KwWwWwWwWwWK',
-  'KWwWwWwWwWwK',
-  'KwWwWwWwWwWK',
-  'KWwWwWwWwWwK',
-  'KwWwWwWwWwWK',
-  'KWwWwWwWwWwK',
-  'KwWwWwWwWwWK',
-  '.KWWWWWWWWK.',
-  '..KKKKKKKK..',
-]);
+//  圍牆：三根尖頭柵欄 + 一道橫樑，柱頂積雪（沿著營地邊界排列）
+A.wallPost = shape(14, 17, ({ rect }) => {
+  for (let i = 0; i < 3; i++) {
+    const x = 1 + i * 5;
+    rect(x, 2, 2, 14, 'w');      // 柱身
+    rect(x + 1, 2, 1, 14, 'W');  // 暗面
+    rect(x, 1, 1, 1, 'w');       // 尖頭
+    rect(x, 0, 1, 1, 'f');       // 積雪
+  }
+  rect(0, 6, 13, 2, 'w');        // 橫樑
+  rect(0, 8, 13, 1, 'W');
+});
 
 //  幫手：搬運工（拉雪橇）與獵人助手
 A.hauler = px(14, [
@@ -875,33 +832,33 @@ A.icoCounter = px(12, [
   '............',
   '............',
 ]);
-A.icoWall = px(12, [
-  '.KKKKKKKKKK.',
-  'KffffffffffK',
-  'KwWwWwWwWwWK',
-  'KWwWwWwWwWwK',
-  'KwWwWwWwWwWK',
+A.icoWall = px(12, [   // 尖頭柵欄（跟實際圍牆同款）
+  '.K..K..K..K.',
+  'KwK.KwK.KwK.',
+  'KwWKKwWKKwWK',
   'KKKKKKKKKKKK',
-  'KWwWwWwWwWwK',
-  'KwWwWwWwWwWK',
-  'KWwWwWwWwWwK',
-  'KwWwWwWwWwWK',
-  '.KKKKKKKKKK.',
-  '............',
+  'KwwwwwwwwwwK',
+  'KWWWWWWWWWWK',
+  'KKKKKKKKKKKK',
+  'KwWKKwWKKwWK',
+  'KwWKKwWKKwWK',
+  'KwWKKwWKKwWK',
+  'KWWKKWWKKWWK',
+  '.KK..KK..KK.',
 ]);
-A.icoTower = px(12, [
-  '.....K......',
-  '....KyK.....',
-  '...KKKKK....',
-  '..KzhhhzK...',
-  '..KzKKKzK...',
-  '..KzKiKzK...',
-  '..KZKKKZK...',
-  '..KZZZZZK...',
-  '...KwWwK....',
-  '...KwWwK....',
-  '..KwwwwwK...',
-  '..KKKKKKK...',
+A.icoTower = px(12, [  // 高腳哨塔（跟實際箭塔同剪影）
+  '.KKKKKKKKKK.',
+  'KwwwwwwwwwwK',
+  'KWKKWKKWKKWK',
+  'KKKKKKKKKKKK',
+  'KwwwwwwwwwwK',
+  'KWWWWWWWWWWK',
+  'KKKKKKKKKKKK',
+  '.KwWKKwWK...',
+  '.KwWKKwWK...',
+  'KwWKKKKKwWK.',
+  'KwWK...KwWK.',
+  'KKK.....KKK.',
 ]);
 A.icoHauler = px(12, [
   '...KKKK.....',
@@ -946,16 +903,33 @@ A.icoMark = px(12, [
   '.....KK.....',
 ]);
 
-// ---------- 木材掉落物 8x7 ----------
-A.woodLog = px(8, [
-  '..KKKK..',
-  '.KWwwwK.',
-  'KWwwbwwK',
-  'KwwbwbwK',
-  'KWwwbwwK',
-  '.KWwwwK.',
-  '..KKKK..',
+// ---------- 木材 12x9（斷面朝左，年輪要看得出來才知道那是木頭）----------
+A.woodLog = px(12, [
+  '.........tu.',
+  '........tKu.',
+  '..KKKKKKKKK.',
+  '.KjjjKwwwwwK',
+  'KjJJjKwwwwwK',
+  'KjJwJKwwwwwK',
+  'KjJJjKWwwwWK',
+  '.KjjjKWWWWWK',
+  '..KKKKKKKKK.',
 ]);
+
+// ---------- 木材場：兩根立柱夾著三層原木 30x22 ----------
+A.woodYard = shape(30, 22, ({ rect }) => {
+  // 立柱
+  rect(1, 2, 3, 19, 'w');  rect(3, 2, 1, 19, 'W');
+  rect(26, 2, 3, 19, 'w'); rect(28, 2, 1, 19, 'W');
+  // 三層原木，左端露出年輪
+  for (let r = 0; r < 3; r++) {
+    const y = 6 + r * 5;
+    rect(5, y, 21, 4, 'w');
+    rect(5, y + 3, 21, 1, 'W');
+    rect(5, y, 4, 4, 'j');
+    rect(6, y + 1, 2, 2, 'J');
+  }
+});
 
 export const BUILD_ICON = {
   shelf: A.icoShelf, counter: A.icoCounter, wall: A.icoWall,

@@ -56,12 +56,12 @@ function maxCamp() {
   return { x: c.x - MAX_EXPAND, y: c.y - MAX_EXPAND, w: c.w + MAX_EXPAND * 2, h: c.h + MAX_EXPAND * 2 };
 }
 
-function blocked(x, y) {
+//  spacing 刻意調小 —— 樹要能長成一片林子，不是均勻散點
+function blocked(x, y, spacing = 12) {
   const c = maxCamp();
   if (x > c.x - 30 && x < c.x + c.w + 30 && y > c.y - 30 && y < c.y + c.h + 30) return true;
-  if (Math.hypot(x - CFG.GATE.x, y - CFG.GATE.y) < CFG.GATE.r + 40) return true;
-  for (const f of CFG.FIREPITS) if (Math.hypot(x - f.x, y - f.y) < 70) return true;
-  for (const p of world.props) if (Math.hypot(x - p.x, y - p.y) < 34) return true;
+  for (const f of CFG.FIREPITS) if (Math.hypot(x - f.x, y - f.y) < 62) return true;
+  for (const p of world.props) if (Math.hypot(x - p.x, y - p.y) < spacing) return true;
   return false;
 }
 
@@ -131,19 +131,31 @@ export function buildWorld() {
   world.ground = cv2;
   paintCamp(g2, campRect());
 
-  // ---------- 道具散佈（樹木密度大幅提升）----------
+  // ---------- 道具散佈 ----------
+  //  樹是資源（砍了給木材），所以密度要高到「隨手就能砍一棵」。
+  //  樹叢化散佈：先撒種子點，再在種子周圍長一小片，看起來像森林而不是雜訊。
   world.props = [];
   const propRng = makeRng(777);
-  for (let i = 0; i < 290; i++) {
-    const x = 16 + propRng() * (W - 32);
-    const y = 40 + propRng() * (H - 90);
-    if (blocked(x, y)) continue;
-    const r = propRng();
-    let kind = 'tree';
-    if (r > 0.80) kind = 'rock';
-    if (r > 0.93) kind = 'ice';
+  const addProp = (x, y, kind) => {
+    if (x < 16 || x > W - 16 || y < 40 || y > H - 50) return;
+    if (blocked(x, y)) return;
     const hp = kind === 'tree' ? CFG.TREE.hp : 0;
     world.props.push({ x: Math.round(x), y: Math.round(y), kind, hp, maxHp: hp, deadT: 0 });
+  };
+
+  // 樹叢
+  for (let i = 0; i < 380; i++) {
+    const cx = 16 + propRng() * (W - 32);
+    const cy = 40 + propRng() * (H - 90);
+    const n = 3 + Math.floor(propRng() * 5);
+    for (let j = 0; j < n; j++) {
+      addProp(cx + (propRng() - 0.5) * 72, cy + (propRng() - 0.5) * 62, 'tree');
+    }
+  }
+  // 零星石頭與冰晶
+  for (let i = 0; i < 110; i++) {
+    addProp(16 + propRng() * (W - 32), 40 + propRng() * (H - 90),
+            propRng() > 0.42 ? 'rock' : 'ice');
   }
 
   world.firepits = CFG.FIREPITS.map((f, i) => ({ ...f, id: i, progress: 0 }));
@@ -231,6 +243,7 @@ function paintCamp(g, c) {
   // 觸發區地面標記
   ringMark(g, CFG.SHELF.x, CFG.SHELF.y, CFG.SHELF.r, '#ffd651');
   ringMark(g, CFG.CASH.x, CFG.CASH.y, CFG.CASH.r, '#9fe8a0');
+  ringMark(g, CFG.WOOD.x, CFG.WOOD.y, CFG.WOOD.r, '#c98f4e');
   for (const p of CFG.PADS) ringMark(g, p.x, p.y, p.r, '#74aae8');
   for (const p of CFG.BUILD_PADS) ringMark(g, p.x, p.y, p.r, '#9fe8a0');
   ringMark(g, CFG.WEAPON_RACK.x, CFG.WEAPON_RACK.y, CFG.WEAPON_RACK.r, '#ff9f5a');

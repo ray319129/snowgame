@@ -35,11 +35,21 @@
   #money .c{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe98a,#f0b429 60%,#a8760f);box-shadow:0 0 0 1px #6b4a0c}
   #moneyVal{color:#ffd651;font-size:15px}
 
-  .bar{position:relative;height:11px;border:2px solid #3b465f;border-radius:2px;background:#121727;overflow:hidden;box-shadow:0 2px 0 #0c1020}
-  .bar>i{position:absolute;inset:0;width:0%;transition:width .12s linear;display:block}
+  /* 金框 + 圓形徽章的像素風血條（參考 血量條 素材） */
+  .bar{position:relative;height:13px;border:2px solid #c9992c;border-radius:0;
+    background:#3a3550;overflow:hidden;
+    box-shadow:0 0 0 2px #14101a, 0 2px 0 #0c1020, inset 0 1px 0 rgba(255,255,255,.12)}
+  .bar>i{position:absolute;inset:0;width:0%;transition:width .12s linear;display:block;
+    box-shadow:inset 0 2px 0 rgba(255,255,255,.22)}
   .bar>b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:9px;font-weight:800;letter-spacing:.6px;color:#dfe7f5;text-shadow:0 1px 0 rgba(0,0,0,.85);font-variant-numeric:tabular-nums}
-  .lbl{font-size:9px;font-weight:800;letter-spacing:1px;color:#8fa0bd;width:26px;flex:none;text-shadow:0 1px 0 #060810}
+    font-size:9px;font-weight:800;letter-spacing:.6px;color:#fff;text-shadow:0 1px 0 rgba(0,0,0,.9);font-variant-numeric:tabular-nums}
+  /* 圓形徽章：金環包著深棕底，跟條身連成一體 */
+  .lbl{font-size:8px;font-weight:800;letter-spacing:0;color:#ffe08a;
+    width:19px;height:19px;flex:none;display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at 38% 32%,#8d6539,#5f4224 70%);
+    border:2px solid #c9992c;border-radius:50%;
+    box-shadow:0 0 0 2px #14101a, 0 2px 0 #0c1020;
+    text-shadow:0 1px 0 #14101a}
 
   #warmFill{background:linear-gradient(#ff8a6a,#d9342c)}
   #warmFill.low{background:linear-gradient(#ff6a5a,#a01810);animation:hpwarn .5s infinite}
@@ -47,7 +57,8 @@
   #loadFill{background:linear-gradient(#7fd4e8,#3b8fb8)}
   #baseFill{background:linear-gradient(#9fe8a0,#3aaa60)}
   #baseFill.low{background:linear-gradient(#ff8a6a,#d93030);animation:hpwarn .5s infinite}
-  #bars{display:flex;flex-direction:column;gap:4px;max-width:190px}
+  #bars{display:flex;flex-direction:column;gap:5px;max-width:196px}
+  #bars .row{gap:7px}
   #bars .row .bar{flex:1}
 
   #zone{
@@ -170,9 +181,9 @@
     <div id="top">
       <div id="money"><span class="c"></span><span id="moneyVal">0</span></div>
       <div id="bars">
-        <div class="row"><span class="lbl">血量</span><div class="bar"><i id="warmFill"></i><b id="warmTxt">100</b></div></div>
-        <div class="row"><span class="lbl">背包</span><div class="bar"><i id="loadFill"></i><b id="loadTxt">0/6</b></div></div>
-        <div class="row"><span class="lbl">基地</span><div class="bar"><i id="baseFill"></i><b id="baseTxt">300</b></div></div>
+        <div class="row"><span class="lbl">血</span><div class="bar"><i id="warmFill"></i><b id="warmTxt">100</b></div></div>
+        <div class="row"><span class="lbl">背</span><div class="bar"><i id="loadFill"></i><b id="loadTxt">0/6</b></div></div>
+        <div class="row"><span class="lbl">基</span><div class="bar"><i id="baseFill"></i><b id="baseTxt">300</b></div></div>
       </div>
     </div>
     <div id="zone">冰原邊緣<em>ZONE 1</em></div>

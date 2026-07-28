@@ -7,7 +7,7 @@ import { ART, BEAR_SPRITES, BUILD_ICON, WEAPON_SPRITE } from './art.js';
 import { px, flipX, drawText, drawTextC, textWidth, abbr } from './pixel.js';
 import { world, PROP_SPRITE, inCamp, campRect } from './world.js';
 import {
-  G, val, nextCost, nextBuildCost, nextWeapon, zoneLocked, pendingMarks,
+  G, val, nextCost, nextBuildCost, nextWeapon, zoneLocked, pendingMarks, countWood,
 } from './game.js';
 import { input } from './input.js';
 
@@ -100,6 +100,7 @@ export function render(dt) {
   // 據點設施
   list.push({ y: CFG.SHELF.y + 10, k: 'shelf', o: CFG.SHELF });
   list.push({ y: CFG.CASH.y + 8,   k: 'cash',  o: CFG.CASH });
+  list.push({ y: CFG.WOOD.y + 8,   k: 'wood',  o: CFG.WOOD });
   list.push({ y: CFG.CAMPFIRE.y,   k: 'campfire', o: CFG.CAMPFIRE });
   list.push({ y: CFG.WEAPON_RACK.y + 6, k: 'rack', o: CFG.WEAPON_RACK });
   if (G.zonesOpen >= CFG.PRESTIGE.unlockZones)
@@ -118,7 +119,7 @@ export function render(dt) {
 
   const DRAW = {
     den: drawDen,
-    prop: drawProp, fire: drawFirepit, shelf: drawShelf,
+    prop: drawProp, fire: drawFirepit, shelf: drawShelf, wood: drawWoodYard,
     cash: drawCash, campfire: drawCampfire, rack: drawRack, prestige: drawPrestige,
     pad: drawPad, bpad: drawBuildPad, tower: drawTower, meat: drawMeat,
     bear: drawBear, cust: drawCustomer, helper: drawHelper, player: drawPlayer,
@@ -139,7 +140,9 @@ export function render(dt) {
 function drawGroundOverlays() {
   const p = G.player;
 
-  if (p.carry.length > 0) pulseRing(CFG.SHELF, '#ffd651');
+  const wood = countWood(p.carry);
+  if (p.carry.length - wood > 0) pulseRing(CFG.SHELF, '#ffd651');
+  if (wood > 0) pulseRing(CFG.WOOD, '#c98f4e');
   if (G.cash > 0) pulseRing(CFG.CASH, '#9fe8a0');
 
   for (const pad of CFG.PADS)
@@ -307,6 +310,24 @@ function drawCash(cz) {
   drawTextC(ctx, '$' + abbr(G.cash), S(cz.x), SY(cz.y - 2 - rows * 3.6) - 11, '#ffe08a');
 }
 
+// ---- 木材場：跟肉完全分開的第二條產線 ----
+function drawWoodYard(wz) {
+  shadow(wz.x, wz.y - 2, 16, 5, 0.28);
+  spr(ART.woodYard, wz.x, wz.y + 8);
+
+  // 剛卸下、還沒被運走的木頭堆在架子前面
+  const n = Math.round(G.woodPile);
+  if (n > 0) {
+    drawPile(() => ART.woodLog, wz.x, wz.y + 6, Math.min(n, 30), {
+      maxW: 4, narrow: 0.35, colW: 5.4, rowH: 3.2,
+    });
+  }
+  // 基地缺血時提示「拿木頭來修」，滿血時顯示賣價
+  const hurt = G.baseHp < G.baseMaxHp;
+  drawTextC(ctx, hurt ? '修基地' : '$' + CFG.TREE.value,
+            S(wz.x), SY(wz.y) + 13, hurt ? '#9fe8a0' : '#ffd651');
+}
+
 function drawRack(r) {
   shadow(r.x, r.y + 4, 12, 4, 0.25);
   spr(ART.padPost, r.x, r.y + 6);
@@ -432,6 +453,21 @@ function drawBear(b) {
     ctx.fillRect(S(b.x) - s.width / 2, SY(b.y) - s.height, s.width, s.height);
     ctx.restore();
   }
+  // 拍打圍牆的爪痕 —— 讓「基地正在被打」看得見
+  if (b.clawT > 0) {
+    const t = 1 - b.clawT / 0.3;
+    ctx.save();
+    ctx.globalAlpha = (1 - t) * 0.9;
+    ctx.strokeStyle = '#ff8a5c'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(S(b.x) + i * 4 - 3, SY(b.y) + 2 - t * 4);
+      ctx.lineTo(S(b.x) + i * 4 + 3, SY(b.y) + 10 - t * 4);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   if (b.hp < b.maxHp) {
     const bw = 18, bx = S(b.x) - bw / 2, by = SY(b.y) - s.height - 5;
     ctx.fillStyle = '#14101a'; ctx.fillRect(bx - 1, by - 1, bw + 2, 4);
@@ -553,13 +589,16 @@ function drawPlayer(p) {
 
   // ---- 背上的肉堆（財富可視化）----
   //  堆得越高越爽。跑動時整座塔會左右擺動，越上面晃越大。
+  //  肉與木頭混著背，各自畫自己的圖 —— 玩家一眼知道身上帶了什麼
   const n = p.carry.length;
   const shown = Math.min(n, CARRY_SHOWN);
   const speedF = Math.min(1, Math.hypot(p.vx, p.vy) / 60);
-  const rows = drawPile(() => ART.meat, p.x, py - 18, shown, {
-    maxW: 4, narrow: 0.16, colW: 4.4, rowH: 2.9,
-    sway: 0.3 + speedF * 0.8, phase: 0, alpha,
-  });
+  const rows = drawPile(
+    (i) => (p.carry[i] === WOOD_MARKER ? ART.woodLog : ART.meat),
+    p.x, py - 18, shown, {
+      maxW: 4, narrow: 0.16, colW: 4.4, rowH: 2.9,
+      sway: 0.3 + speedF * 0.8, phase: 0, alpha,
+    });
   if (n > shown) drawTextC(ctx, 'X' + n, S(p.x), SY(py) - 18 - rows * 3 - 11, '#ffd651');
 
   if (p.hurtFlash > 0) {
@@ -704,8 +743,14 @@ function drawScreenUI() {
   //  導引箭頭：永遠只指一個地方，玩家不會迷路
   let guide = null;
   if (p.alive) {
-    if (p.carry.length >= val.cap() && !inCamp(p.x, p.y)) guide = { ...CFG.SHELF, color: '#ffd651' };
-    else if (G.cash > 0 && inCamp(p.x, p.y) && p.carry.length === 0) guide = { ...CFG.CASH, color: '#9fe8a0' };
+    const wood = countWood(p.carry);
+    //  基地在挨打時，「把木頭運回去」的優先度高於任何賺錢動作
+    if (wood > 0 && G.baseHp < G.baseMaxHp * 0.6) guide = { ...CFG.WOOD, color: '#9fe8a0' };
+    else if (p.carry.length >= val.cap() && !inCamp(p.x, p.y)) {
+      guide = wood > p.carry.length - wood
+        ? { ...CFG.WOOD, color: '#c98f4e' }
+        : { ...CFG.SHELF, color: '#ffd651' };
+    } else if (G.cash > 0 && inCamp(p.x, p.y) && p.carry.length === 0) guide = { ...CFG.CASH, color: '#9fe8a0' };
   }
   if (guide) {
     const dx = guide.x - p.x, dy = guide.y - p.y;

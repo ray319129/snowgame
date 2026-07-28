@@ -56,6 +56,8 @@ export const G = {
   padCharge: 0, padKey: null,
   cashTimer: 0, cashStreak: 0, cashStreakT: 0,
   shelfTimer: 0,
+  woodTimer: 0,
+  woodPile: 0,                 // 木材場上堆著的木頭（純視覺，會慢慢被運走）
   coldWarnT: 0,
   lockHintT: -99,
   flash: 0,
@@ -246,6 +248,10 @@ function spawnBear(plot) {
     tx: 0, ty: 0, thinkT: 0,
     hitT: 0, flash: 0, walkT: 0,
     knockX: 0, knockY: 0,
+    sepX: 0, sepY: 0,        // 每幀重算的互斥推力
+    swingT: 0, clawT: 0,     // 拍打基地的冷卻與爪痕動畫
+    raiding: false,
+    lane: (rng() - 0.5) * 2, // 突襲時走哪一路（-1 最左 ~ +1 最右）
     radius: CFG.BEAR.radius * (v.id === 'cub' ? 0.72 : v.id === 'rage' ? 1.2 : 1),
   };
   b.tx = b.x; b.ty = b.y;
@@ -517,7 +523,7 @@ function updateCombat(dt, p) {
 // ---------------- 砍樹 ----------------
 function chopTree(p, w) {
   if (p.atkTimer > 0) return;
-  let best = null, bd = w.range * 0.72;
+  let best = null, bd = w.range * 0.95;
   for (const pr of world.props) {
     if (pr.kind !== 'tree' || pr.deadT > 0 || pr.hp <= 0) continue;
     const d = Math.hypot(pr.x - p.x, pr.y - p.y);
@@ -563,6 +569,8 @@ function updateTrees(dt) {
     pr.deadT -= dt;
     if (pr.deadT <= 0) pr.hp = pr.maxHp;
   }
+  // 木材場上的木頭會慢慢被運走，堆才不會永遠留在那
+  if (G.woodPile > 0) G.woodPile = Math.max(0, G.woodPile - dt * 1.6);
 }
 
 // ---------------- 熊 AI（主動獵殺玩家）----------------
@@ -580,6 +588,44 @@ function updateBears(dt) {
 
   const camp = campRect();
   const playerOutside = p.alive && !inCamp(p.x, p.y);
+
+  //  互斥力：熊之間會互相推開，避免整群疊在同一個點上卡住。
+  //  這是「群體看起來像一群動物」而不是「一坨貼圖」的關鍵。
+  const sr = CFG.BEAR.sepRadius, sr2 = sr * sr;
+  for (const b of G.bears) { b.sepX = 0; b.sepY = 0; }
+  for (let i = 0; i < G.bears.length; i++) {
+    const a = G.bears[i];
+    for (let j = i + 1; j < G.bears.length; j++) {
+      const c = G.bears[j];
+      const dx = a.x - c.x, dy = a.y - c.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > sr2 || d2 < 0.0001) continue;
+      const d = Math.sqrt(d2);
+      const push = (1 - d / sr) / d;
+      a.sepX += dx * push; a.sepY += dy * push;
+      c.sepX -= dx * push; c.sepY -= dy * push;
+    }
+  }
+
+  //  突襲名額：離據點最近的幾隻熊拿到攻城資格，其他的留在自己的獵場。
+  //  有上限才不會變成「一進營地就被三十隻熊推平」，也讓圍攻線攤得開。
+  const campCX = camp.x + camp.w / 2, campTopY = camp.y;
+  const raidRange = playerOutside ? CFG.BEAR.raidRange : CFG.BEAR.raidRangeHiding;
+  //  名額要「黏著」：已經在攻城的熊保住位子，一路打到底。
+  //  每幀重新選最近的六隻的話，熊會在半路一直被換掉，然後被熊窩繩索拉回去，
+  //  結果就是一群熊在半路來回走、永遠打不到牆。
+  let active = 0;
+  const cands = [];
+  for (const b of G.bears) {
+    const d = Math.hypot(b.x - campCX, b.y - campTopY);
+    if (b.raiding && d < raidRange * 1.35) { active++; continue; }
+    b.raiding = false;
+    if (d < raidRange) cands.push([d, b]);
+  }
+  cands.sort((a, c) => a[0] - c[0]);
+  for (let i = 0; i < cands.length && active < CFG.BEAR.raidMax; i++, active++) {
+    cands[i][1].raiding = true;
+  }
 
   for (const b of G.bears) {
     if (b.flash > 0) b.flash -= dt;
@@ -600,22 +646,21 @@ function updateBears(dt) {
     const hunt = playerOutside && denDist < CFG.BEAR.denLeash &&
                  (dp < z.bearAggro || inPlot);
 
-    // 玩家躲在營地時，附近的熊會主動衝向營地
-    const campCX = camp.x + camp.w / 2, campTopY = camp.y;
-    const distToCamp = Math.hypot(b.x - campCX, b.y - campTopY);
-    const raidCamp = !playerOutside && p.alive &&
-                     denDist < CFG.BEAR.denLeash * 1.8 && distToCamp > 20;
+    //  追玩家永遠優先於攻城
+    if (hunt) b.raiding = false;
+    //  每隻熊沿著自己那一路進攻，整群才會攤開成一條攻擊線而不是疊一坨
+    const laneX = campCX + b.lane * (camp.w * 0.45);
 
     let mvx = 0, mvy = 0, spd = b.spd;
 
     if (hunt) {
       mvx = dpx / (dp || 1); mvy = dpy / (dp || 1);
       spd *= 1.1;
-    } else if (raidCamp) {
-      const rdx = campCX - b.x, rdy = campTopY - 18 - b.y;
+    } else if (b.raiding) {
+      const rdx = laneX - b.x, rdy = campTopY - 14 - b.y;
       const rd = Math.hypot(rdx, rdy) || 1;
       mvx = rdx / rd; mvy = rdy / rd;
-      spd *= 0.88;
+      spd *= 0.9;
     } else {
       b.thinkT -= dt;
       if (b.thinkT <= 0) {
@@ -636,8 +681,8 @@ function updateBears(dt) {
       if (d > 6) { mvx = dx / d; mvy = dy / d; }
     }
 
-    b.vx = mvx * spd + b.knockX;
-    b.vy = mvy * spd + b.knockY;
+    b.vx = mvx * spd + b.knockX + b.sepX * CFG.BEAR.sepForce;
+    b.vy = mvy * spd + b.knockY + b.sepY * CFG.BEAR.sepForce;
     b.x += b.vx * dt; b.y += b.vy * dt;
     if (Math.abs(b.vx) > 4) b.face = b.vx > 0 ? 1 : -1;
     if (Math.hypot(mvx, mvy) > 0.1) b.walkT += dt * (hunt ? 8 : 4);
@@ -654,13 +699,30 @@ function updateBears(dt) {
       }
     }
 
-    // 熊不能進營地；觸碰外圍時攻擊基地
+    // 熊進不了營地，但會沿著外圍拍打圍牆 —— 一次一爪，看得見也聽得見
+    if (b.swingT > 0) b.swingT -= dt;
+    if (b.clawT > 0) b.clawT -= dt;
+
     const pad = 12;
-    if (b.x > camp.x - pad && b.x < camp.x + camp.w + pad &&
-        b.y > camp.y - pad && b.y < camp.y + camp.h + pad) {
-      b.y = camp.y - pad;
-      b.knockY = -40;
-      if (G.baseBreakT <= 0) G.baseHp = Math.max(0, G.baseHp - CFG.BASE.bearDmg * dt);
+    const wallY = camp.y - pad;
+    const overWall = b.x > camp.x - pad && b.x < camp.x + camp.w + pad;
+    if (overWall && b.y > wallY && b.y < camp.y + camp.h + pad) {
+      b.y = wallY;
+      b.vy = Math.min(0, b.vy);
+    }
+    //  用「貼著牆」而不是「穿進營地」判定攻擊 —— 被推回牆線上的熊
+    //  剛好落在邊界外，穿透判定會讓牠們站在那裡完全不打。
+    if (overWall && Math.abs(b.y - wallY) < 5 && b.swingT <= 0) {
+      b.swingT = CFG.BASE.bearSwing * (0.85 + rng() * 0.3);
+      b.clawT = 0.3;
+      if (G.baseBreakT <= 0) {
+        const dmg = CFG.BASE.bearHit * b.variant.dmg;
+        G.baseHp = Math.max(0, G.baseHp - dmg);
+        float(b.x, b.y - 22, '-' + Math.round(dmg), '#ff8a5c');
+        burst(b.x, wallY + 4, 5, '#8d6539', 55);
+        G.shake = Math.max(G.shake, 1.8);
+        SFX.hit('crush');
+      }
     }
     b.x = Math.max(12, Math.min(CFG.WORLD.w - 12, b.x));
     b.y = Math.max(24, Math.min(CFG.WORLD.h - 12, b.y));
@@ -677,7 +739,7 @@ function updateBears(dt) {
 
   // 基地血量耗盡懲罰（扣 20% 金錢，基地恢復至 35%，5 秒無敵緩衝）
   if (G.baseHp <= 0 && G.baseBreakT <= 0) {
-    G.baseBreakT = 5;
+    G.baseBreakT = CFG.BASE.breakCd;
     G.baseHp = G.baseMaxHp * 0.35;
     const penalty = Math.floor(G.money * 0.2);
     if (penalty > 0) {
@@ -778,36 +840,63 @@ function updateDrops(dt) {
   }
 }
 
+// ---------------- 背包內容分類（肉 vs 木材）----------------
+export function countWood(carry) {
+  let n = 0;
+  for (const v of carry) if (v === WOOD_MARKER) n++;
+  return n;
+}
+function countMeat(carry) { return carry.length - countWood(carry); }
+function lastIndexOfMeat(carry) {
+  for (let i = carry.length - 1; i >= 0; i--) if (carry[i] !== WOOD_MARKER) return i;
+  return -1;
+}
+
 // ---------------- 站立觸發區 ----------------
 function updateTriggers(dt, p) {
-  // ---- 把肉放上貨架（木材可修復基地或當貨品賣）----
+  // ---- 貨架：只收肉 ----
   const sh = CFG.SHELF;
-  if (Math.hypot(p.x - sh.x, p.y - sh.y) < sh.r && p.carry.length > 0) {
-    G.shelfTimer -= dt;
-    while (G.shelfTimer <= 0 && p.carry.length > 0) {
-      const topVal = p.carry[p.carry.length - 1];
-      const isWood = topVal === WOOD_MARKER;
-      if (isWood && G.baseHp < G.baseMaxHp) {
-        // 木材優先修復基地
-        G.shelfTimer += CFG.SELL_INTERVAL;
-        p.carry.pop();
-        G.baseHp = Math.min(G.baseMaxHp, G.baseHp + CFG.TREE.hpRepair);
-        SFX.pickup(p.carry.length);
-        float(sh.x + (rng() - 0.5) * 14, sh.y - 24, '+' + CFG.TREE.hpRepair + ' 基地', '#9fe8a0');
-        burst(sh.x, sh.y - 8, 4, '#9fe8a0', 38);
-      } else if (shelfSpace() > 0) {
-        // 上貨架（基地滿血時木材也賣錢）
-        G.shelfTimer += CFG.SELL_INTERVAL;
-        const v = p.carry.pop();
-        depositMeat(v);
-        SFX.pickup(G.shelf.length);
-        coinFly(p.x, p.y - 16 - p.carry.length * 1.5, sh.x, sh.y - 16, isWood ? 'bill' : 'meat');
-      } else {
-        break;
-      }
+  if (Math.hypot(p.x - sh.x, p.y - sh.y) < sh.r && countMeat(p.carry) > 0) {
+    // 貨架滿的時候不要讓計時器一直往負數跑，否則清出空位會瞬間倒完
+    G.shelfTimer = Math.max(-CFG.SELL_INTERVAL, G.shelfTimer - dt);
+    while (G.shelfTimer <= 0 && shelfSpace() > 0) {
+      const i = lastIndexOfMeat(p.carry);
+      if (i < 0) break;
+      G.shelfTimer += CFG.SELL_INTERVAL;
+      const v = p.carry.splice(i, 1)[0];
+      depositMeat(v);
+      SFX.pickup(G.shelf.length);
+      coinFly(p.x, p.y - 16 - p.carry.length * 1.5, sh.x, sh.y - 16, 'meat');
     }
   } else {
     G.shelfTimer = 0;
+  }
+
+  // ---- 木材場：只收木頭。基地缺血就修基地，滿血就直接換錢 ----
+  const wd = CFG.WOOD;
+  if (Math.hypot(p.x - wd.x, p.y - wd.y) < wd.r && countWood(p.carry) > 0) {
+    G.woodTimer -= dt;
+    while (G.woodTimer <= 0) {
+      const i = p.carry.lastIndexOf(WOOD_MARKER);
+      if (i < 0) break;
+      G.woodTimer += CFG.SELL_INTERVAL;
+      p.carry.splice(i, 1);
+      if (G.baseHp < G.baseMaxHp) {
+        G.baseHp = Math.min(G.baseMaxHp, G.baseHp + CFG.TREE.hpRepair);
+        float(wd.x + (rng() - 0.5) * 14, wd.y - 26, '+' + CFG.TREE.hpRepair + ' 基地', '#9fe8a0');
+        burst(wd.x, wd.y - 8, 4, '#9fe8a0', 38);
+        SFX.pickup(4);
+      } else {
+        G.woodPile = Math.min(60, G.woodPile + 1);
+        earn(CFG.TREE.value);
+        G.cashStreak++; G.cashStreakT = 0.6;
+        SFX.sell(G.cashStreak);
+        coinFly(wd.x, wd.y - 14, p.x, p.y - 20, 'coin');
+        float(wd.x + (rng() - 0.5) * 16, wd.y - 26, '+$' + CFG.TREE.value, '#ffd651');
+      }
+    }
+  } else {
+    G.woodTimer = 0;
   }
 
   // ---- 收現金 ----

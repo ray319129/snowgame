@@ -6,7 +6,7 @@ import { initInput, pollInput, input, setInputEnabled } from './input.js';
 import { initAudio } from './audio.js';
 import {
   G, initGame, update, val, save, resetSave,
-  nextCost, nextBuildCost, nextWeapon, zoneLocked, levelCap,
+  nextCost, nextBuildCost, nextWeapon, levelCap,
   pendingMarks, markSpendable, buyMark, doPrestige,
 } from './game.js';
 import { initRender, resizeRender, render, SM } from './render.js';
