@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0a0d16">
+<title>極晝獵手 Frostline</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#070910;overscroll-behavior:none;touch-action:none}
+  body{
+    display:flex;align-items:center;justify-content:center;
+    font-family:"Segoe UI","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;
+    color:#e8eef7;user-select:none;
+  }
+  #stage{position:relative;background:#0a0d16;box-shadow:0 0 0 2px #1b2233,0 24px 60px rgba(0,0,0,.7)}
+  #game{display:block;image-rendering:pixelated;image-rendering:crisp-edges;width:100%;height:100%}
+
+  /* ---------- HUD ---------- */
+  #hud{position:absolute;inset:0;pointer-events:none;font-size:13px}
+  .row{display:flex;align-items:center;gap:6px}
+
+  #top{position:absolute;top:0;left:0;right:0;padding:8px 9px;display:flex;flex-direction:column;gap:6px}
+
+  #money{
+    align-self:flex-start;
+    display:flex;align-items:center;gap:5px;
+    background:linear-gradient(#20283c,#151b2b);
+    border:2px solid #3b465f;border-radius:3px;
+    padding:4px 9px 4px 7px;
+    font-weight:800;letter-spacing:.5px;
+    font-variant-numeric:tabular-nums;
+    box-shadow:0 2px 0 #0c1020, inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  #money .c{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe98a,#f0b429 60%,#a8760f);box-shadow:0 0 0 1px #6b4a0c}
+  #moneyVal{color:#ffd651;font-size:15px}
+
+  .bar{position:relative;height:11px;border:2px solid #3b465f;border-radius:2px;background:#121727;overflow:hidden;box-shadow:0 2px 0 #0c1020}
+  .bar>i{position:absolute;inset:0;width:0%;transition:width .12s linear;display:block}
+  .bar>b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:9px;font-weight:800;letter-spacing:.6px;color:#dfe7f5;text-shadow:0 1px 0 rgba(0,0,0,.85);font-variant-numeric:tabular-nums}
+  .lbl{font-size:9px;font-weight:800;letter-spacing:1px;color:#8fa0bd;width:26px;flex:none;text-shadow:0 1px 0 #060810}
+
+  #warmFill{background:linear-gradient(#ff8a6a,#d9342c)}
+  #warmFill.low{background:linear-gradient(#ff6a5a,#a01810);animation:hpwarn .5s infinite}
+  @keyframes hpwarn{50%{filter:brightness(1.6)}}
+  #loadFill{background:linear-gradient(#7fd4e8,#3b8fb8)}
+  #baseFill{background:linear-gradient(#9fe8a0,#3aaa60)}
+  #baseFill.low{background:linear-gradient(#ff8a6a,#d93030);animation:hpwarn .5s infinite}
+  #bars{display:flex;flex-direction:column;gap:4px;max-width:190px}
+  #bars .row .bar{flex:1}
+
+  #zone{
+    position:absolute;top:8px;right:9px;text-align:right;
+    font-size:10px;font-weight:800;letter-spacing:2px;color:#9fb2d2;
+    text-shadow:0 1px 0 #060810;
+  }
+  #zone em{display:block;font-style:normal;font-size:8px;letter-spacing:1px;color:#5e708f;margin-top:2px}
+
+  /* ---------- toasts ---------- */
+  #toasts{position:absolute;left:0;right:0;top:34%;display:flex;flex-direction:column;align-items:center;gap:6px}
+  .toast{
+    background:rgba(10,14,24,.9);border:2px solid #4a5878;border-radius:3px;
+    padding:7px 14px;font-size:12px;font-weight:800;letter-spacing:1px;color:#ffe08a;
+    box-shadow:0 3px 0 rgba(0,0,0,.5);
+    animation:pop .35s cubic-bezier(.2,1.7,.5,1), fade .5s 1.5s forwards;
+    white-space:nowrap;
+  }
+  .toast.warn{color:#ff9d7a;border-color:#7a4a58}
+  @keyframes pop{from{transform:scale(.6) translateY(8px);opacity:0}to{transform:none;opacity:1}}
+  @keyframes fade{to{opacity:0;transform:translateY(-10px)}}
+
+  /* ---------- death vignette ---------- */
+  #dead{position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 30%,rgba(120,190,255,.35) 100%);
+    opacity:0;transition:opacity .25s;mix-blend-mode:screen}
+
+  /* ---------- cold vignette ---------- */
+  #cold{position:absolute;inset:0;box-shadow:inset 0 0 60px 10px rgba(150,205,255,0);transition:box-shadow .3s}
+
+  /* ---------- start ---------- */
+  #start{
+    position:absolute;inset:0;background:rgba(6,9,17,.94);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+    pointer-events:auto;cursor:pointer;padding:24px;text-align:center;
+  }
+  #start h1{font-size:24px;letter-spacing:6px;color:#ffd651;text-shadow:0 3px 0 #7a4a0c,0 5px 12px rgba(0,0,0,.8);font-weight:900}
+  #start h2{font-size:10px;letter-spacing:4px;color:#6d80a3;font-weight:700}
+  #start p{font-size:11px;line-height:1.9;color:#9fb2d2;max-width:250px}
+  #start .k{color:#ffd651;font-weight:800}
+  #start .go{margin-top:6px;font-size:12px;letter-spacing:3px;color:#e8eef7;font-weight:800;
+    border:2px solid #4a5878;padding:8px 20px;border-radius:3px;background:#1a2133;
+    animation:blink 1.4s infinite;box-shadow:0 3px 0 #0c1020}
+  @keyframes blink{50%{border-color:#ffd651;color:#ffd651}}
+  #start.hide{opacity:0;pointer-events:none;transition:opacity .3s}
+
+  /* ---------- 存檔提示 ---------- */
+  #saveDot{
+    position:absolute;right:9px;bottom:8px;
+    font-size:9px;font-weight:800;letter-spacing:2px;color:#8fe8a0;
+    text-shadow:0 1px 0 #060810;
+    opacity:0;transition:opacity .25s;
+  }
+  #saveDot::before{content:"● "}
+  #saveDot.on{opacity:.85}
+
+  /* ---------- 站上台座時的說明面板 ---------- */
+  #panel{
+    position:absolute;left:50%;bottom:12px;transform:translateX(-50%) translateY(8px);
+    background:linear-gradient(#1d2537,#141a29);
+    border:2px solid #4a5878;border-radius:4px;
+    padding:7px 12px 8px;min-width:170px;max-width:88%;
+    box-shadow:0 4px 0 rgba(0,0,0,.55);
+    opacity:0;transition:opacity .14s,transform .14s;pointer-events:none;
+  }
+  #panel.on{opacity:1;transform:translateX(-50%) translateY(0)}
+  #panel .pname{font-size:13px;font-weight:800;letter-spacing:1px;color:#ffd651}
+  #panel .pdesc{font-size:10px;color:#93a6c6;margin-top:2px}
+  #panel .pval{font-size:11px;font-weight:700;margin-top:5px;color:#cfe0f7;font-variant-numeric:tabular-nums}
+  #panel .pval b{color:#8fe8a0}
+  #panel .pcost{font-size:11px;font-weight:800;color:#ffd651;margin-top:3px}
+  #panel .pcost.no{color:#ff9d7a}
+  #panel .pbar{height:4px;background:#0e1421;border-radius:2px;margin-top:6px;overflow:hidden}
+  #panel .pbar i{display:block;height:100%;width:0%;background:linear-gradient(90deg,#ffca6e,#ffe08a)}
+
+  /* ---------- 印記樹 ---------- */
+  #modal{
+    position:absolute;inset:0;background:rgba(6,9,17,.9);
+    display:none;flex-direction:column;padding:14px 12px;pointer-events:auto;overflow-y:auto;
+  }
+  #modal.on{display:flex}
+  #modal h3{font-size:13px;letter-spacing:3px;color:#d9bcff;text-align:center;font-weight:900}
+  #modal .sub{font-size:10px;color:#8c9ab5;text-align:center;margin:3px 0 10px;line-height:1.7}
+  #modal .marks{
+    display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:10px;
+    font-size:15px;font-weight:900;color:#e0c0ff;
+  }
+  #modal .marks .dot{width:12px;height:12px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,#fff,#9fdff0 55%,#6a4fa8);box-shadow:0 0 6px #7f5fd0}
+  .node{
+    display:flex;align-items:center;gap:9px;
+    background:#161d2c;border:2px solid #38445e;border-radius:3px;
+    padding:6px 8px;margin-bottom:5px;cursor:pointer;
+  }
+  .node.can{border-color:#8f6fd0;background:#20182f}
+  .node.max{opacity:.45}
+  .node .nm{flex:1}
+  .node .nm b{display:block;font-size:12px;font-weight:800;color:#e8eef7}
+  .node .nm span{display:block;font-size:9px;color:#8c9ab5;margin-top:1px}
+  .node .lv{font-size:10px;font-weight:800;color:#9fb2d2;font-variant-numeric:tabular-nums}
+  .node .pc{font-size:12px;font-weight:900;color:#e0c0ff;min-width:26px;text-align:right}
+  #resetBtn{
+    margin:6px 0 4px;padding:10px;text-align:center;border-radius:3px;
+    border:2px solid #7a5a2a;background:linear-gradient(#3a2a12,#241a0c);
+    font-size:12px;font-weight:900;letter-spacing:2px;color:#ffd651;cursor:pointer;
+  }
+  #resetBtn.can{border-color:#ffd651;animation:blink 1.3s infinite}
+  #resetBtn.no{opacity:.4}
+  #modalClose{
+    margin-top:4px;padding:8px;text-align:center;font-size:11px;letter-spacing:2px;
+    color:#8c9ab5;border:2px solid #38445e;border-radius:3px;cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="game"></canvas>
+  <div id="hud">
+    <div id="cold"></div>
+    <div id="dead"></div>
+    <div id="top">
+      <div id="money"><span class="c"></span><span id="moneyVal">0</span></div>
+      <div id="bars">
+        <div class="row"><span class="lbl">血量</span><div class="bar"><i id="warmFill"></i><b id="warmTxt">100</b></div></div>
+        <div class="row"><span class="lbl">背包</span><div class="bar"><i id="loadFill"></i><b id="loadTxt">0/6</b></div></div>
+        <div class="row"><span class="lbl">基地</span><div class="bar"><i id="baseFill"></i><b id="baseTxt">300</b></div></div>
+      </div>
+    </div>
+    <div id="zone">冰原邊緣<em>ZONE 1</em></div>
+    <div id="saveDot">已存檔</div>
+    <div id="toasts"></div>
+    <div id="panel">
+      <div class="pname" id="pName">—</div>
+      <div class="pdesc" id="pDesc"></div>
+      <div class="pval" id="pVal"></div>
+      <div class="pcost" id="pCost"></div>
+      <div class="pbar"><i id="pBar"></i></div>
+    </div>
+  </div>
+  <div id="modal">
+    <h3>極 光 印 記</h3>
+    <div class="sub">遠征歸來會重置金錢、升級與據點，<br>但印記與其效果永久保留。</div>
+    <div class="marks"><span class="dot"></span><span id="markCount">0</span></div>
+    <div id="nodes"></div>
+    <div id="resetBtn">遠征歸來</div>
+    <div id="modalClose">關閉</div>
+  </div>
+  <div id="start">
+    <h2>FROSTLINE</h2>
+    <h1>極晝獵手</h1>
+    <p>
+      <span class="k">移動</span>即攻擊，走近肉塊自動撿。<br>
+      站進圈圈就會自動<span class="k">上貨／升級</span>。<br>
+      離開營地會<span class="k">失溫扣血</span>，火堆能擋住寒氣。
+    </p>
+    <div class="go">點擊開始</div>
+  </div>
+</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
