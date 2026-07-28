@@ -239,35 +239,63 @@ function updateHelpers(dt) {
 const HAULER_RANGE = 420;
 const HAULER_CARRY = 5;
 
+/** 這趟搬的是木頭還是肉？第一個撿到的東西決定這一趟的目的地。 */
+function haulingWood(h) { return h.carry.length > 0 && h.carry[0] === WOOD_MARKER; }
+
 function updateHauler(h, dt, cx, cy) {
-  // 背滿了 → 回貨架卸貨
+  // ---- 先找下一個目標 ----
+  //  撿完一個就立刻找下一個，否則 target 剛清空就會觸發「回家」，
+  //  變成每趟只搬一塊，HAULER_CARRY 形同虛設。
+  //
+  //  用 owner 記「是誰預定的」而不是一個 taken 布林 —— 之前用布林時，
+  //  搬運工預定完自己那份，下一幀看到旗標又以為被別人拿走，於是每幀重選目標：
+  //  自己永遠走不到定點，而且範圍內每個掉落物都被標成已預定，玩家也撿不起來。
+  if (h.carry.length < HAULER_CARRY &&
+      (!h.target || h.target.owner !== h || G.drops.indexOf(h.target) < 0)) {
+    if (h.target) h.target.owner = null;
+    h.target = null;
+    const wantWood = haulingWood(h);
+    let bd = HAULER_RANGE;
+    for (const d of G.drops) {
+      if (d.owner && d.owner !== h) continue;
+      // 一趟只搬同一種貨，才不會拿著木頭跑去貨架
+      if (h.carry.length > 0 && (d.value === WOOD_MARKER) !== wantWood) continue;
+      if (Math.hypot(d.x - cx, d.y - cy) > HAULER_RANGE) continue;
+      const dh = Math.hypot(d.x - h.x, d.y - h.y);
+      if (dh < bd) { bd = dh; h.target = d; }
+    }
+    if (h.target) h.target.owner = h;
+  }
+
+  // ---- 背滿了、或附近沒東西撿了 → 回據點卸貨（木頭送木材場，肉送貨架）----
   if (h.carry.length >= HAULER_CARRY || (h.carry.length > 0 && !h.target)) {
-    const arrived = moveTo(h, CFG.SHELF.x, CFG.SHELF.y + 16, 70, dt);
-    if (arrived || Math.hypot(h.x - CFG.SHELF.x, h.y - CFG.SHELF.y) < 22) {
-      h.dropT = (h.dropT || 0) - dt;
+    if (h.target) { h.target.owner = null; h.target = null; }
+    const wood = haulingWood(h);
+    const dest = wood ? CFG.WOOD : CFG.SHELF;
+    const arrived = moveTo(h, dest.x, dest.y + 16, 70, dt);
+    if (arrived || Math.hypot(h.x - dest.x, h.y - dest.y) < 22) {
+      //  卸不掉時不要讓計時器一直往負數跑，否則清出空位會瞬間倒完
+      h.dropT = Math.max(-0.08, (h.dropT || 0) - dt);
       while (h.dropT <= 0 && h.carry.length > 0) {
-        h.dropT += 0.08;
-        if (shelfSpace() > 0) {
+        if (wood) {
+          h.dropT += 0.08;
+          h.carry.pop();
+          if (G.baseHp < G.baseMaxHp) {
+            G.baseHp = Math.min(G.baseMaxHp, G.baseHp + CFG.TREE.hpRepair);
+            float(dest.x, dest.y - 26, '+' + CFG.TREE.hpRepair + ' 基地', '#9fe8a0');
+          } else {
+            G.woodPile = Math.min(60, G.woodPile + 1);
+            G.cash += CFG.TREE.value;
+            coinFly(h.x, h.y - 14, CFG.CASH.x, CFG.CASH.y - 6, 'bill');
+          }
+        } else if (shelfSpace() > 0) {
+          h.dropT += 0.08;
           depositMeat(h.carry.pop());
-          coinFly(h.x, h.y - 14, CFG.SHELF.x, CFG.SHELF.y - 16, 'meat');
+          coinFly(h.x, h.y - 14, dest.x, dest.y - 16, 'meat');
         } else break;
       }
     }
     return;
-  }
-
-  // 找最近的地上肉塊
-  if (!h.target || h.target.taken || G.drops.indexOf(h.target) < 0) {
-    h.target = null;
-    let bd = HAULER_RANGE;
-    for (const d of G.drops) {
-      if (d.taken) continue;
-      const dist = Math.hypot(d.x - cx, d.y - cy);
-      if (dist > HAULER_RANGE) continue;
-      const dh = Math.hypot(d.x - h.x, d.y - h.y);
-      if (dh < bd) { bd = dh; h.target = d; }
-    }
-    if (h.target) h.target.taken = true;
   }
 
   if (!h.target) {

@@ -836,7 +836,9 @@ function updateDrops(dt) {
     d.x = Math.max(6, Math.min(CFG.WORLD.w - 6, d.x));
     d.y = Math.max(20, Math.min(CFG.WORLD.h - 6, d.y));
 
-    if (!p.alive || d.taken) continue;
+    //  玩家永遠搶得贏搬運工：被預定的掉落物照樣撿得起來，
+    //  撿走後搬運工發現目標不在 G.drops 裡就會自己換目標。
+    if (!p.alive) continue;
 
     const dx = p.x - d.x, dy = p.y - d.y - 4;
     const dist = Math.hypot(dx, dy);

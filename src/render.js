@@ -507,7 +507,8 @@ function drawHelper(h) {
   const moving = Math.abs(h.vx) + Math.abs(h.vy) > 2;
   shadow(h.x, h.y - 1, 6, 3, 0.26);
   spr(s, h.x, h.y - (moving ? Math.round(Math.abs(Math.sin(h.walkT))) : 0));
-  for (let i = 0; i < h.carry.length; i++) spr(ART.meat, h.x, h.y - 17 - i * 3);
+  for (let i = 0; i < h.carry.length; i++)
+    spr(h.carry[i] === WOOD_MARKER ? ART.woodLog : ART.meat, h.x, h.y - 17 - i * 3);
   if (h.kind === 'hunter' && h.swing > 0) {
     ctx.save();
     ctx.globalAlpha = 0.8;
