@@ -422,6 +422,20 @@ A.icoPower = px(12, [ // 火把
   '.....KWK....',
   '......KK....',
 ]);
+A.icoVigor = px(12, [ // 體魄：心臟（帶高光，跟血條同色系）
+  '.KK....KK...',
+  'KmmKKKKmmK..',
+  'KmnmmmmmnmK.',
+  'KmnmmmmmmmK.',
+  'KmnmmmmmmmK.',
+  'KMmmmmmmmmK.',
+  '.KMmmmmmmK..',
+  '..KMmmmmK...',
+  '...KMmmK....',
+  '....KMK.....',
+  '.....K......',
+  '............',
+]);
 A.icoWarm = px(12, [  // 大衣（毛領 + 拉鍊）
   '..KKKKKKKK..',
   '.KffffffffK.',

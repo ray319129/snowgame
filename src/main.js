@@ -93,6 +93,7 @@ function upgDisplay(key, lv) {
   if (key === 'cap')   return Math.round(v + G.tree.blood * CFG.PRESTIGE.TREE.blood.per) + ' 格';
   if (key === 'speed') return Math.round(v * (1 + G.tree.swift * CFG.PRESTIGE.TREE.swift.per));
   if (key === 'power') return (v * val.weapon().mult).toFixed(1) + ' 傷害';
+  if (key === 'vigor') return Math.round(v) + ' 血量';
   if (key === 'warm')  return '−' + Math.round((1 - v) * 100) + '% 失溫傷害';
   return fmt(v);
 }
@@ -214,9 +215,10 @@ function updateHud() {
   const m = Math.floor(G.money);
   if (m !== hudMoney) { hudMoney = m; el.money.textContent = abbr(m); }
 
-  const w = Math.max(0, p.hp) / CFG.PLAYER.hpMax;
+  const hpMax = val.hpMax();
+  const w = Math.max(0, p.hp) / hpMax;
   el.warmF.style.width = (w * 100).toFixed(1) + '%';
-  el.warmT.textContent = Math.ceil(Math.max(0, p.hp)) + ' / ' + CFG.PLAYER.hpMax;
+  el.warmT.textContent = Math.ceil(Math.max(0, p.hp)) + ' / ' + hpMax;
   el.warmF.className = w < 0.3 ? 'low' : '';
 
   const cap = val.cap(), n = p.carry.length;

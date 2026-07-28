@@ -423,7 +423,10 @@ function drawWall() {
   }
 }
 
-const PAD_ICON = { cap: 'icoCap', speed: 'icoSpeed', power: 'icoPower', warm: 'icoWarm' };
+const PAD_ICON = {
+  cap: 'icoCap', speed: 'icoSpeed', power: 'icoPower',
+  vigor: 'icoVigor', warm: 'icoWarm',
+};
 
 function drawPad(pad) {
   shadow(pad.x, pad.y + 5, 11, 4, 0.25);
@@ -544,8 +547,16 @@ function drawHelper(h) {
   const moving = Math.abs(h.vx) + Math.abs(h.vy) > 2;
   shadow(h.x, h.y - 1, 6, 3, 0.26);
   spr(s, h.x, h.y - (moving ? Math.round(Math.abs(Math.sin(h.walkT))) : 0));
-  for (let i = 0; i < h.carry.length; i++)
-    spr(h.carry[i] === WOOD_MARKER ? ART.woodLog : ART.meat, h.x, h.y - 17 - i * 3);
+  //  載重會跟著玩家背包一起長到幾十個，所以要堆成山而不是排成一根竹竿
+  const hn = h.carry.length;
+  if (hn > 0) {
+    const shown = Math.min(hn, 32);
+    const rows = drawPile(
+      (i) => (h.carry[i] === WOOD_MARKER ? ART.woodLog : ART.meat),
+      h.x, h.y - 16, shown,
+      { maxW: 3, narrow: 0.2, colW: 4.2, rowH: 2.8, sway: 0.3, phase: h.i * 1.7 });
+    if (hn > shown) drawTextC(ctx, 'X' + hn, S(h.x), SY(h.y) - 16 - rows * 3 - 10, '#ffd651');
+  }
   if (h.kind === 'hunter' && h.swing > 0) {
     ctx.save();
     ctx.globalAlpha = 0.8;

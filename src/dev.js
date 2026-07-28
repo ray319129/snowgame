@@ -12,6 +12,9 @@ import { world, campRect } from './world.js';
 
 let root = null, open = false, statusEl = null;
 
+/** 只有網址帶 ?dev=1 才啟用。整包工具在一般玩家的場次裡完全不會建立。 */
+export const DEV_ON = new URLSearchParams(location.search).get('dev') === '1';
+
 /** 目前所有升級／建設全部拉到指定比例（0~1） */
 function setProgress(f) {
   for (const k in CFG.UPG)   G.upg[k]   = Math.round(CFG.UPG[k].max * f);
@@ -169,6 +172,7 @@ export function toggle(v) {
 }
 
 export function initDev() {
+  if (!DEV_ON) return;          // 沒開就連 CSS 都不注入
   const style = document.createElement('style');
   style.textContent = `
     #dev{position:fixed;left:6px;top:6px;z-index:99;display:none;
@@ -195,10 +199,9 @@ export function initDev() {
   `;
   document.head.appendChild(style);
 
-  window.addEventListener('keydown', (e) => {
-    if (e.key === '`' || e.key === 'F2') { e.preventDefault(); toggle(); }
-  });
-  if (new URLSearchParams(location.search).has('dev')) toggle(true);
+  //  只認網址參數 ?dev=1。沒有快捷鍵 —— 一般玩家不可能誤觸開啟。
+  if (!DEV_ON) return;
+  toggle(true);
 
   // 面板開著時每半秒刷新一次數值
   setInterval(() => { if (open) status(); }, 500);

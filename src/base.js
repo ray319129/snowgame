@@ -241,7 +241,8 @@ function updateHelpers(dt) {
 }
 
 const HAULER_RANGE = 420;
-const HAULER_CARRY = 5;
+/** 搬運工的載重跟著玩家的背包一起長，後期才不會變成一次搬五塊的雞肋 */
+function haulerCarry() { return Math.max(4, Math.round(val.cap() * 0.5)); }
 
 /** 這趟搬的是木頭還是肉？第一個撿到的東西決定這一趟的目的地。 */
 function haulingWood(h) { return h.carry.length > 0 && h.carry[0] === WOOD_MARKER; }
@@ -283,7 +284,7 @@ function updateHauler(h, dt, cx, cy) {
 
   // ============ 撿貨中 ============
   //  撿完一個就立刻找下一個，否則 target 剛清空就會馬上切去卸貨，
-  //  變成每趟只搬一塊，HAULER_CARRY 形同虛設。
+  //  變成每趟只搬一塊，載重上限形同虛設。
   //
   //  用 owner 記「是誰預定的」而不是一個 taken 布林 —— 之前用布林時，
   //  搬運工預定完自己那份，下一幀看到旗標又以為被別人拿走，於是每幀重選目標：
@@ -305,7 +306,7 @@ function updateHauler(h, dt, cx, cy) {
   }
 
   // 背滿了、或附近沒東西撿了 → 進入卸貨狀態
-  if (h.carry.length >= HAULER_CARRY || (h.carry.length > 0 && !h.target)) {
+  if (h.carry.length >= haulerCarry() || (h.carry.length > 0 && !h.target)) {
     if (h.target) { h.target.owner = null; h.target = null; }
     h.mode = 'deliver';
     return;

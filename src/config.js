@@ -52,10 +52,11 @@ export const CFG = {
 
   // 四條主升級線的升級台（站上去蓄力 1.5 秒才升一級）
   PADS: [
-    { key: 'cap',   x: 296, y: 1462, r: 21 },
-    { key: 'speed', x: 348, y: 1462, r: 21 },
-    { key: 'power', x: 400, y: 1462, r: 21 },
-    { key: 'warm',  x: 452, y: 1462, r: 21 },
+    { key: 'cap',   x: 284, y: 1462, r: 20 },
+    { key: 'speed', x: 332, y: 1462, r: 20 },
+    { key: 'power', x: 380, y: 1462, r: 20 },
+    { key: 'vigor', x: 428, y: 1462, r: 20 },
+    { key: 'warm',  x: 476, y: 1462, r: 20 },
   ],
   PAD_CHARGE: 1.5,          // 站上去要蓄力幾秒才升一級
 
@@ -187,6 +188,9 @@ export const CFG = {
              base: 12, g: 1.18, start: 86, per: 0.05, max: 50, mode: 'mul' },
     power: { name: '武器威力', desc: '每次揮擊的傷害',   unit: '',
              base: 10, g: 1.18, start: 4,  per: 0.11, max: 60, mode: 'mul' },
+    //  血量上限：後期熊的傷害會漲到 30+，沒有這條線出門就是被三下打死
+    vigor: { name: '體魄',     desc: '提高血量上限',     unit: '',
+             base: 16, g: 1.19, start: 100, per: 16, max: 50, mode: 'add' },
     warm:  { name: '保暖',     desc: '減少野外失溫扣血', unit: '',
              base: 14, g: 1.18, start: 1,  per: 0.05, max: 50, mode: 'div' },
   },

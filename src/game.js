@@ -12,7 +12,7 @@ import { initBase, updateBase, resetBase, shelfSpace, depositMeat } from './base
 
 export const rng = makeRng(4242);
 
-const EMPTY_UPG   = () => ({ cap: 0, speed: 0, power: 0, warm: 0 });
+const EMPTY_UPG   = () => ({ cap: 0, speed: 0, power: 0, vigor: 0, warm: 0 });
 const EMPTY_BUILD = () => ({ shelf: 0, counter: 0, wall: 0, tower: 0, hauler: 0, hunter: 0 });
 const EMPTY_TREE  = () => ({ blood: 0, skill: 0, swift: 0, hide: 0, harvest: 0, fame: 0, spark: 0 });
 
@@ -155,6 +155,8 @@ export const val = {
   speed: () => upgValue('speed', G.upg.speed) * (1 + G.tree.swift * T.swift.per),
   /** 實際傷害 = 威力升級 × 武器倍率 */
   power: () => upgValue('power', G.upg.power) * CFG.WEAPONS[G.weapon].mult,
+  /** 血量上限（體魄升級線） */
+  hpMax: () => Math.round(upgValue('vigor', G.upg.vigor)),
   warm:  () => upgValue('warm', G.upg.warm) * (1 - G.tree.hide * T.hide.per),
   /** 一塊肉在某區域的價格 */
   meat:  (zone) => zone.meat * (1 + G.tree.skill * T.skill.per),
@@ -231,7 +233,7 @@ export function initGame() {
     y: sp ? sp.y : CFG.RESPAWN.y,
     vx: 0, vy: 0, face: 1,
     // 回來時至少給一半體溫，免得一進遊戲就凍死
-    hp: sp ? Math.max(CFG.PLAYER.hpMax * 0.5, sp.hp || 0) : CFG.PLAYER.hpMax,
+    hp: sp ? Math.max(val.hpMax() * 0.5, sp.hp || 0) : val.hpMax(),
     carry: sp ? (sp.carry || []) : [],
     atkTimer: 0, swing: 0, swingDir: 0,
     iframes: sp ? 2 : 0, walkT: 0, hurtFlash: 0,
@@ -502,11 +504,11 @@ function updateVitals(dt, p) {
   if (p.combatT > 0) p.combatT -= dt;
 
   if (camp) {
-    p.hp = Math.min(CFG.PLAYER.hpMax, p.hp + CFG.COLD.campHeal * dt);
+    p.hp = Math.min(val.hpMax(), p.hp + CFG.COLD.campHeal * dt);
     G.baseHp = Math.min(G.baseMaxHp, G.baseHp + CFG.BASE.campRepair * dt);
   } else if (nearFire) {
     // 火驅散寒氣，但戰鬥中不回血
-    if (p.combatT <= 0) p.hp = Math.min(CFG.PLAYER.hpMax, p.hp + CFG.COLD.fireHeal * dt);
+    if (p.combatT <= 0) p.hp = Math.min(val.hpMax(), p.hp + CFG.COLD.fireHeal * dt);
   } else if (!G.devGod) {
     const z = zoneAt(p.y);
     const dps = CFG.COLD.base * z.cold * val.warm();
@@ -861,7 +863,7 @@ function respawn() {
   p.alive = true;
   p.x = CFG.RESPAWN.x; p.y = CFG.RESPAWN.y;
   p.vx = p.vy = 0;
-  p.hp = CFG.PLAYER.hpMax;
+  p.hp = val.hpMax();
   p.iframes = CFG.PLAYER.respawnIframes;
   SFX.respawn();
   burst(p.x, p.y - 10, 20, '#ffa62b', 70);
@@ -1141,8 +1143,15 @@ export function buy(key) {
   const cost = nextCost(key);
   if (G.money < cost) return false;
   G.money -= cost;
+  const before = val.hpMax();
   G.upg[key]++;
   const lv = G.upg[key];
+  //  升體魄時把新增的上限直接補成當下血量 —— 看得到數字漲才有感覺
+  if (key === 'vigor') {
+    const gain = val.hpMax() - before;
+    G.player.hp = Math.min(val.hpMax(), G.player.hp + gain);
+    float(G.player.x, G.player.y - 34, '+' + gain + ' HP', '#8fe8a0');
+  }
   if (lv % 5 === 0) { SFX.upgradeBig(); G.flash = 0.4; } else SFX.upgrade();
   const q = CFG.PADS.find(o => o.key === key);
   if (q) { float(q.x, q.y - 36, 'LV' + lv, '#74aae8'); burst(q.x, q.y - 8, 12, '#74aae8', 55); }
@@ -1206,7 +1215,7 @@ export function doPrestige() {
   initBase();
   respawnAllBears();
   const p = G.player;
-  p.x = CFG.RESPAWN.x; p.y = CFG.RESPAWN.y; p.carry = []; p.hp = CFG.PLAYER.hpMax;
+  p.x = CFG.RESPAWN.x; p.y = CFG.RESPAWN.y; p.carry = []; p.hp = val.hpMax();
 
   G.flash = 1.2; G.shake = 8;
   SFX.gateOpen();
