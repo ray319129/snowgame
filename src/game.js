@@ -58,6 +58,18 @@ export const G = {
   shelfTimer: 0,
   woodTimer: 0,
   woodPile: 0,                 // 木材場上堆著的木頭（純視覺，會慢慢被運走）
+
+  //  箭塔搬遷：扛在身上的塔（索引）與蓄力進度
+  towerPos: null,              // 玩家自訂的塔位（null = 用預設點位）
+  towerCarry: -1,
+  towerGrab: 0,
+  towerPlace: 0,
+  towerLock: false,            // 剛放下：要離開範圍才能再扛
+
+  //  開發者工具（? dev=1 或按 ` 開啟）
+  devThreat: null,             // 覆寫威脅等級
+  devGod: false,
+  devSpeed: 1,
   coldWarnT: 0,
   lockHintT: -99,
   flash: 0,
@@ -86,6 +98,7 @@ export function save() {
       stats: G.stats,
       shelf: G.shelf, cash: G.cash,
       baseHp: G.baseHp,
+      towerPos: G.towerPos,
       // 玩家身上的東西也要存，不然重整就掉背包
       player: p ? { x: p.x, y: p.y, hp: p.hp, carry: p.carry } : null,
       fire: world.firepits.map(f => f.lit),
@@ -122,6 +135,7 @@ function load() {
     G.shelf = d.shelf || [];
     G.cash = d.cash || 0;
     G.baseHp = d.baseHp || CFG.BASE.hp;
+    G.towerPos = Array.isArray(d.towerPos) ? d.towerPos : null;
     G.savedPlayer = d.player || null;
     if (d.fire) d.fire.forEach((lit, i) => { if (world.firepits[i]) world.firepits[i].lit = lit; });
     world.gate.open = true;
@@ -150,6 +164,31 @@ export const val = {
   shelfMax: () => Math.round(buildValue('shelf', G.build.shelf)),
   queueMax: () => Math.round(buildValue('counter', G.build.counter)),
 };
+
+/**
+ * 威脅等級 —— 熊有多強。
+ * 由玩家目前的實力推算，所以是玩家自己把熊養大的：每買一次升級，
+ * 野外就變兇一點。這樣中期蓋滿箭塔之後才不會瞬間失去挑戰性。
+ * 新生的熊才會套用當下的威脅值，已經在場上的熊不會突然變強。
+ */
+export function threatLevel() {
+  if (G.devThreat !== null && G.devThreat !== undefined) return G.devThreat;
+  let u = 0; for (const k in CFG.UPG) u += G.upg[k];
+  let b = 0; for (const k in CFG.BUILD) b += G.build[k];
+  const raw = u * 0.55 + b * 1.6 + G.weapon * 4 + G.prestiges * 3;
+  return Math.max(0, Math.min(CFG.THREAT.max, Math.floor(raw / CFG.THREAT.div)));
+}
+
+/** 威脅等級換算成各項倍率 */
+export function threatMul(t = threatLevel()) {
+  const T = CFG.THREAT;
+  return {
+    hp:   1 + Math.pow(t, T.hpPow) * T.hpMul,
+    dmg:  1 + t * T.dmgMul,
+    spd:  1 + t * T.spdMul,
+    meat: 1 + t * T.meatMul,
+  };
+}
 
 /** 這條升級線在目前區域的等級上限 */
 export function levelCap(key) { return upgCapFor(G.zonesOpen, key); }
@@ -214,10 +253,16 @@ function respawnAllBears() {
 }
 
 // ---------------- 熊 ----------------
-function pickVariant() {
-  const r = rng();
-  let acc = 0;
-  for (const v of CFG.BEAR.VARIANTS) { acc += v.p; if (r <= acc) return v; }
+//  威脅越高，狂暴熊越多、幼熊越少 —— 後期的熊群組成本身就更硬
+function pickVariant(t = 0) {
+  const T = CFG.THREAT;
+  const w = CFG.BEAR.VARIANTS.map(v => {
+    const bias = v.id === 'rage' ? T.rageBias : v.id === 'cub' ? T.cubBias : 0;
+    return Math.max(0.01, v.p + bias * t);
+  });
+  const total = w.reduce((a, b) => a + b, 0);
+  let r = rng() * total;
+  for (let i = 0; i < w.length; i++) { r -= w[i]; if (r <= 0) return CFG.BEAR.VARIANTS[i]; }
   return CFG.BEAR.VARIANTS[1];
 }
 
@@ -235,16 +280,19 @@ function nearDen(plot, radius = CFG.BEAR.denRadius) {
 
 function spawnBear(plot) {
   const z = plot.zone;
-  const v = pickVariant();
-  const hp = Math.max(1, Math.round(z.bearHp * v.hp));
+  const t = threatLevel();
+  const m = threatMul(t);
+  const v = pickVariant(t);
+  const hp = Math.max(1, Math.round(z.bearHp * v.hp * m.hp));
   const spot = nearDen(plot, CFG.BEAR.denRadius * 0.8);
   const b = {
     x: spot.x, y: spot.y,
     vx: 0, vy: 0, face: 1,
     hp, maxHp: hp,
     zone: z, plot, variant: v,
-    spd: z.bearSpd * v.spd,
-    dmg: z.bearDmg * v.dmg,
+    threat: t,               // 出生時的威脅值，決定掉肉價值
+    spd: z.bearSpd * v.spd * m.spd,
+    dmg: z.bearDmg * v.dmg * m.dmg,
     tx: 0, ty: 0, thinkT: 0,
     hitT: 0, flash: 0, walkT: 0,
     knockX: 0, knockY: 0,
@@ -267,7 +315,9 @@ export function killBear(b, byHelper = false) {
   if (!byHelper) G.shake = Math.max(G.shake, 2.2);
 
   const n = Math.max(1, z.drops + b.variant.drop + G.tree.harvest * T.harvest.per);
-  const value = val.meat(z);
+  //  肉價跟著這隻熊出生時的威脅走：熊變硬，肉也變值錢，
+  //  升級把熊養大這件事才會是「賺更多」而不是純粹的懲罰。
+  const value = val.meat(z) * threatMul(b.threat || 0).meat;
   for (let i = 0; i < n; i++) {
     const a = rng() * Math.PI * 2, s = 26 + rng() * 34;
     G.drops.push({
@@ -401,6 +451,7 @@ export function update(dt, inp) {
   updateVitals(dt, p);
   updateCombat(dt, p);
   updateTriggers(dt, p);
+  updateTowerMove(dt, p);      // 要在 updateTriggers 之後：站在台座上時不搶塔
 
   updateBears(dt);
   updateDrops(dt);
@@ -456,7 +507,7 @@ function updateVitals(dt, p) {
   } else if (nearFire) {
     // 火驅散寒氣，但戰鬥中不回血
     if (p.combatT <= 0) p.hp = Math.min(CFG.PLAYER.hpMax, p.hp + CFG.COLD.fireHeal * dt);
-  } else {
+  } else if (!G.devGod) {
     const z = zoneAt(p.y);
     const dps = CFG.COLD.base * z.cold * val.warm();
     p.hp -= dps * dt;
@@ -769,6 +820,7 @@ function updateBears(dt) {
 
 function hurt(amount, nx, ny) {
   const p = G.player;
+  if (G.devGod) return;
   p.hp -= amount;
   p.iframes = CFG.PLAYER.iframes;
   p.combatT = CFG.COLD.combatLock;      // 受擊後火堆不回血
@@ -882,6 +934,72 @@ function countMeat(carry) { return carry.length - countWood(carry); }
 function lastIndexOfMeat(carry) {
   for (let i = carry.length - 1; i >= 0; i--) if (carry[i] !== WOOD_MARKER) return i;
   return -1;
+}
+
+// ---------------- 箭塔搬遷 ----------------
+/**
+ * 站在塔底蓄力把塔扛起來，走到想要的位置停下來就放下。
+ * 用「站著不動」當放置條件是安全的：只有在扛塔狀態才會觸發，
+ * 平常走路不會誤放。
+ */
+function updateTowerMove(dt, p) {
+  const T = CFG.TOWER;
+
+  // ---- 扛著塔：跟著玩家走，停下來就放 ----
+  if (G.towerCarry >= 0) {
+    const t = G.towers[G.towerCarry];
+    if (!t) { G.towerCarry = -1; return; }
+    t.x = p.x; t.y = p.y + 2;
+    t.cd = Math.max(t.cd, 0.3);              // 搬運中不開火
+
+    if (Math.hypot(p.vx, p.vy) < T.stillSpd) {
+      G.towerPlace += dt;
+      if (G.towerPlace >= T.placeT) {
+        G.towerPlace = 0;
+        G.towerCarry = -1;
+        //  放下之後玩家就站在塔底下，不鎖的話蓄力環會立刻重新開始，
+        //  變成「放下 → 又扛起來」的無限迴圈。要先走開才能再扛。
+        G.towerLock = true;
+        t.x = Math.round(p.x); t.y = Math.round(p.y + 2);
+        saveTowerPos();
+        burst(t.x, t.y, 12, '#9fe8a0', 60);
+        G.shake = Math.max(G.shake, 2.5);
+        SFX.hit('crush');
+        G.onToast('箭塔已就位');
+        save();
+      }
+    } else {
+      G.towerPlace = 0;
+    }
+    return;
+  }
+
+  // ---- 沒扛塔：站在某座塔底下蓄力就扛起來 ----
+  //  站在升級／建設台座上時不搶塔，否則塔剛好放在台座旁邊會搶走操作
+  if (G.padKey) { G.towerGrab = 0; return; }
+  let near = -1, bd = T.grabR;
+  for (let i = 0; i < G.towers.length; i++) {
+    const d = Math.hypot(p.x - G.towers[i].x, p.y - G.towers[i].y);
+    if (d < bd) { bd = d; near = i; }
+  }
+  if (near < 0) { G.towerGrab = 0; G.towerLock = false; return; }
+  // 剛放下的塔要先走開才能再扛起來
+  if (G.towerLock) { G.towerGrab = 0; return; }
+
+  G.towerGrab += dt;
+  if (G.towerGrab >= T.grabT) {
+    G.towerGrab = 0;
+    G.towerCarry = near;
+    G.towerPlace = 0;
+    burst(G.towers[near].x, G.towers[near].y, 10, '#ffd651', 55);
+    SFX.pickup(3);
+    G.onToast('扛起箭塔 — 走到定點停下放置');
+  }
+}
+
+/** 把目前的塔位存進 G，存檔時一起寫進去 */
+export function saveTowerPos() {
+  G.towerPos = G.towers.map(t => ({ x: Math.round(t.x), y: Math.round(t.y) }));
 }
 
 // ---------------- 站立觸發區 ----------------

@@ -16,12 +16,15 @@ export function initBase() {
   // 圍牆等級 → 營地實際範圍（會重畫底圖，擴建看得見）
   setCampExpand(buildValue('wall', G.build.wall));
 
-  // 箭塔
+  // 箭塔 —— 有玩家自訂位置就用自訂的，沒有才落回預設點位
   G.towers = [];
   for (let i = 0; i < G.build.tower && i < CFG.TOWER_SPOTS.length; i++) {
-    const s = CFG.TOWER_SPOTS[i];
+    const saved = G.towerPos && G.towerPos[i];
+    const s = saved || CFG.TOWER_SPOTS[i];
     G.towers.push({ x: s.x, y: s.y, cd: 0, range: 150 + i * 8 });
   }
+  G.towerCarry = -1;
+  G.towerGrab = 0; G.towerPlace = 0;
 
   // 幫手
   const want = { hauler: G.build.hauler, hunter: G.build.hunter };

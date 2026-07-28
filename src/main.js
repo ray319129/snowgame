@@ -6,10 +6,11 @@ import { initInput, pollInput, input, setInputEnabled } from './input.js';
 import { initAudio } from './audio.js';
 import {
   G, initGame, update, val, save, resetSave,
-  nextCost, nextBuildCost, nextWeapon, levelCap,
+  nextCost, nextBuildCost, nextWeapon, levelCap, threatLevel,
   pendingMarks, markSpendable, buyMark, doPrestige,
 } from './game.js';
 import { initRender, resizeRender, render, SM } from './render.js';
+import { initDev } from './dev.js';
 import { abbr } from './pixel.js';
 
 const stage   = document.getElementById('stage');
@@ -201,7 +202,7 @@ function renderModal() {
 }
 
 // ---------------- HUD ----------------
-let hudMoney = -1, hudCap = -1, hudCarry = -1, hudZone = -1;
+let hudMoney = -1, hudCap = -1, hudCarry = -1, hudZone = -1, hudThreat = -1;
 const inCampNow = (p) => {
   const c = CFG.CAMP, e = 0;
   return p.x > c.x - e && p.x < c.x + c.w + e && p.y > c.y - e && p.y < c.y + c.h + e;
@@ -231,9 +232,10 @@ function updateHud() {
   el.baseF.className = baseW < 0.35 ? 'low' : '';
 
   const z = zoneAt(p.y);
-  if (z.id !== hudZone) {
-    hudZone = z.id;
-    el.zone.innerHTML = `${z.name}<em>${z.tag}</em>`;
+  const th = threatLevel();
+  if (z.id !== hudZone || th !== hudThreat) {
+    hudZone = z.id; hudThreat = th;
+    el.zone.innerHTML = `${z.name}<em>${z.tag} · 威脅 ${th}</em>`;
   }
 
   // 低血：紅色暈影；在野外失溫中：偏藍
@@ -260,9 +262,15 @@ function frame(now) {
   acc += dt;
 
   const inp = pollInput();
+  //  開發者加速：一幀多跑幾次固定步進（不改變物理步長，行為跟正常速度一致）
+  const mul = G.devSpeed || 1;
+  const maxSteps = 5 * mul;
   let steps = 0;
-  while (acc >= STEP && steps < 5) { update(STEP, inp); acc -= STEP; steps++; }
-  if (steps === 5) acc = 0;
+  while (acc >= STEP && steps < maxSteps) {
+    for (let k = 0; k < mul; k++) update(STEP, inp);
+    acc -= STEP; steps += mul;
+  }
+  if (steps >= maxSteps) acc = 0;
 
   render(dt);
   updateHud();
@@ -274,6 +282,7 @@ function boot() {
   initGame();
   resize();
   initInput(stage, () => initAudio());
+  initDev();               // ` 或 F2 開啟，網址加 ?dev=1 直接開
   requestAnimationFrame(frame);
 }
 

@@ -162,6 +162,19 @@ function drawGroundOverlays() {
     ctx.restore();
   }
 
+  // 扛塔蓄力環（站在塔底下不動就會扛起來）
+  if (G.towerCarry < 0 && G.towerGrab > 0.02) {
+    const t = (Math.sin(G.time * 9) + 1) / 2;
+    ctx.save();
+    ctx.globalAlpha = 0.5 + t * 0.4;
+    ctx.strokeStyle = '#ffd651'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.arc(S(p.x), SY(p.y) - 4, 12,
+            -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, G.towerGrab / CFG.TOWER.grabT));
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // 蓄力環
   if (G.padKey && G.padCharge > 0.02) {
     const pad = findPadPos(G.padKey);
@@ -353,6 +366,30 @@ function drawPrestige(p) {
 function drawTower(t) {
   const tier = Math.max(0, Math.min(ART.towers.length - 1, G.build.tower - 1));
   const s = ART.towers[tier];
+  const carried = G.towers[G.towerCarry] === t;
+
+  // 扛在身上時整座塔浮起來、半透明，並在腳下畫出落點與射程
+  if (carried) {
+    const ready = Math.min(1, G.towerPlace / CFG.TOWER.placeT);
+    ctx.save();
+    ctx.globalAlpha = 0.25 + ready * 0.3;
+    ctx.strokeStyle = ready >= 1 ? '#9fe8a0' : '#cfe0f7'; ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.arc(S(t.x), SY(t.y), t.range, 0, 7); ctx.stroke();
+    ctx.restore();
+    shadow(t.x, t.y - 1, 7, 3, 0.18);
+    spr(s, t.x, t.y - 12 - Math.round(Math.sin(G.time * 5) * 2), 0.62);
+    if (ready > 0) {
+      ctx.save();
+      ctx.strokeStyle = '#9fe8a0'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(S(t.x), SY(t.y) - 4, 13, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ready);
+      ctx.stroke();
+      ctx.restore();
+    }
+    return;
+  }
+
   shadow(t.x, t.y - 1, 6 + tier * 2, 4, 0.3);
   spr(s, t.x, t.y);
   // 頂端的火光／極光隨等級變亮
