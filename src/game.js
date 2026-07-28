@@ -815,10 +815,25 @@ function respawn() {
   burst(p.x, p.y - 10, 20, '#ffa62b', 70);
 }
 
+/**
+ * 玩家正站在「收得下他手上這批貨」的卸貨圈裡嗎？
+ * 用當下位置判斷而不是記狀態旗標：貨架滿了就回傳 false，
+ * 玩家不會因為站在放不下東西的圈圈裡而變成撿不了東西。
+ */
+function inDepositZone(p) {
+  const wood = countWood(p.carry);
+  if (p.carry.length - wood > 0 && shelfSpace() > 0 &&
+      Math.hypot(p.x - CFG.SHELF.x, p.y - CFG.SHELF.y) < CFG.SHELF.r) return true;
+  if (wood > 0 &&
+      Math.hypot(p.x - CFG.WOOD.x, p.y - CFG.WOOD.y) < CFG.WOOD.r) return true;
+  return false;
+}
+
 // ---------------- 掉落物 ----------------
 function updateDrops(dt) {
   const p = G.player;
   const cap = val.cap();
+  const depositing = inDepositZone(p);
 
   for (let i = G.drops.length - 1; i >= 0; i--) {
     const d = G.drops[i];
@@ -838,7 +853,8 @@ function updateDrops(dt) {
 
     //  玩家永遠搶得贏搬運工：被預定的掉落物照樣撿得起來，
     //  撿走後搬運工發現目標不在 G.drops 裡就會自己換目標。
-    if (!p.alive) continue;
+    //  但站在卸貨圈裡時先把身上的貨放完 —— 否則一邊放一邊撿，背包永遠清不空。
+    if (!p.alive || depositing) continue;
 
     const dx = p.x - d.x, dy = p.y - d.y - 4;
     const dist = Math.hypot(dx, dy);

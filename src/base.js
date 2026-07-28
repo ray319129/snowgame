@@ -70,6 +70,7 @@ function makeHelper(kind, i) {
     x: c.x + 40 + i * 22, y: c.y + c.h - 40,
     vx: 0, vy: 0, face: 1, walkT: 0,
     state: 'idle', target: null, carry: [], atkT: 0,
+    mode: 'gather', dropT: 0,
   };
 }
 
@@ -243,33 +244,11 @@ const HAULER_CARRY = 5;
 function haulingWood(h) { return h.carry.length > 0 && h.carry[0] === WOOD_MARKER; }
 
 function updateHauler(h, dt, cx, cy) {
-  // ---- 先找下一個目標 ----
-  //  撿完一個就立刻找下一個，否則 target 剛清空就會觸發「回家」，
-  //  變成每趟只搬一塊，HAULER_CARRY 形同虛設。
-  //
-  //  用 owner 記「是誰預定的」而不是一個 taken 布林 —— 之前用布林時，
-  //  搬運工預定完自己那份，下一幀看到旗標又以為被別人拿走，於是每幀重選目標：
-  //  自己永遠走不到定點，而且範圍內每個掉落物都被標成已預定，玩家也撿不起來。
-  if (h.carry.length < HAULER_CARRY &&
-      (!h.target || h.target.owner !== h || G.drops.indexOf(h.target) < 0)) {
-    if (h.target) h.target.owner = null;
-    h.target = null;
-    const wantWood = haulingWood(h);
-    let bd = HAULER_RANGE;
-    for (const d of G.drops) {
-      if (d.owner && d.owner !== h) continue;
-      // 一趟只搬同一種貨，才不會拿著木頭跑去貨架
-      if (h.carry.length > 0 && (d.value === WOOD_MARKER) !== wantWood) continue;
-      if (Math.hypot(d.x - cx, d.y - cy) > HAULER_RANGE) continue;
-      const dh = Math.hypot(d.x - h.x, d.y - h.y);
-      if (dh < bd) { bd = dh; h.target = d; }
-    }
-    if (h.target) h.target.owner = h;
-  }
-
-  // ---- 背滿了、或附近沒東西撿了 → 回據點卸貨（木頭送木材場，肉送貨架）----
-  if (h.carry.length >= HAULER_CARRY || (h.carry.length > 0 && !h.target)) {
-    if (h.target) { h.target.owner = null; h.target = null; }
+  // ============ 卸貨中：一定要把身上的貨全部放完才會再出發 ============
+  //  這個狀態必須是「黏著」的。之前每幀重新判斷該不該回家，結果放下第一塊之後
+  //  背包沒滿了、附近又找得到新目標，回家的條件就不成立，搬運工就扛著剩下的貨
+  //  跑去撿下一個 —— 看起來就是「賣一個就跑掉」。
+  if (h.mode === 'deliver') {
     const wood = haulingWood(h);
     const dest = wood ? CFG.WOOD : CFG.SHELF;
     const arrived = moveTo(h, dest.x, dest.y + 16, 70, dt);
@@ -292,9 +271,40 @@ function updateHauler(h, dt, cx, cy) {
           h.dropT += 0.08;
           depositMeat(h.carry.pop());
           coinFly(h.x, h.y - 14, dest.x, dest.y - 16, 'meat');
-        } else break;
+        } else break;      // 貨架滿了就站在原地等位子，不會扛著肉跑掉
       }
     }
+    if (h.carry.length === 0) { h.mode = 'gather'; h.dropT = 0; }
+    return;
+  }
+
+  // ============ 撿貨中 ============
+  //  撿完一個就立刻找下一個，否則 target 剛清空就會馬上切去卸貨，
+  //  變成每趟只搬一塊，HAULER_CARRY 形同虛設。
+  //
+  //  用 owner 記「是誰預定的」而不是一個 taken 布林 —— 之前用布林時，
+  //  搬運工預定完自己那份，下一幀看到旗標又以為被別人拿走，於是每幀重選目標：
+  //  自己永遠走不到定點，而且範圍內每個掉落物都被標成已預定，玩家也撿不起來。
+  if (!h.target || h.target.owner !== h || G.drops.indexOf(h.target) < 0) {
+    if (h.target) h.target.owner = null;
+    h.target = null;
+    const wantWood = haulingWood(h);
+    let bd = HAULER_RANGE;
+    for (const d of G.drops) {
+      if (d.owner && d.owner !== h) continue;
+      // 一趟只搬同一種貨，才不會拿著木頭跑去貨架
+      if (h.carry.length > 0 && (d.value === WOOD_MARKER) !== wantWood) continue;
+      if (Math.hypot(d.x - cx, d.y - cy) > HAULER_RANGE) continue;
+      const dh = Math.hypot(d.x - h.x, d.y - h.y);
+      if (dh < bd) { bd = dh; h.target = d; }
+    }
+    if (h.target) h.target.owner = h;
+  }
+
+  // 背滿了、或附近沒東西撿了 → 進入卸貨狀態
+  if (h.carry.length >= HAULER_CARRY || (h.carry.length > 0 && !h.target)) {
+    if (h.target) { h.target.owner = null; h.target = null; }
+    h.mode = 'deliver';
     return;
   }
 
