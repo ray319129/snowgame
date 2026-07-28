@@ -30,8 +30,8 @@ export const CFG = {
   //  熊用「一次一爪」而不是持續掉血 —— 看得見、聽得見、才有威脅感
   BASE: {
     hp: 300,
-    bearHit: 4,             // 每爪傷害
-    bearSwing: 1.8,         // 每爪間隔（秒）
+    bearHit: 2,             // 每爪傷害
+    bearSwing: 2.2,         // 每爪間隔（秒）
     campRepair: 1.2,        // 玩家待在營地內的自然修復 HP/s
     breakCd: 5,             // 被打爆後的無敵緩衝
   },
@@ -145,7 +145,7 @@ export const CFG = {
     raidRangeHiding: 460,
     //  同時圍攻的名額。沒有這個上限的話，玩家一進營地就會被 30 隻熊推平，
     //  而且熊全部擠在同一段牆上，看起來像一坨貼圖。
-    raidMax: 6,
+    raidMax: 5,
     // 變體：機率 / 血量倍率 / 速度倍率 / 傷害倍率 / 掉肉加成 / 體型
     VARIANTS: [
       { id: 'cub',   name: '幼熊',   p: 0.30, hp: 0.45, spd: 1.45, dmg: 0.55, drop: -1, scale: 'cub'   },

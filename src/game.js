@@ -250,7 +250,7 @@ function spawnBear(plot) {
     knockX: 0, knockY: 0,
     sepX: 0, sepY: 0,        // 每幀重算的互斥推力
     swingT: 0, clawT: 0,     // 拍打基地的冷卻與爪痕動畫
-    raiding: false,
+    raiding: false, hunting: false,
     lane: (rng() - 0.5) * 2, // 突襲時走哪一路（-1 最左 ~ +1 最右）
     radius: CFG.BEAR.radius * (v.id === 'cub' ? 0.72 : v.id === 'rage' ? 1.2 : 1),
   };
@@ -573,6 +573,24 @@ function updateTrees(dt) {
   if (G.woodPile > 0) G.woodPile = Math.max(0, G.woodPile - dt * 1.6);
 }
 
+/**
+ * 這隻熊現在追得到玩家嗎？追人永遠優先於攻城，只有這裡回傳 false 才會去拆據點。
+ * 「追不到」的情況：玩家死了、躲進營地（熊進不去）、或不在感知範圍又不在牠的地塊裡。
+ */
+function canHunt(b, p, playerOutside, campCX, campTopY) {
+  if (!playerOutside) return false;
+  const den = b.plot.den;
+  //  離窩太遠就放棄追人（這是「獵場熱點」的來源），但已經打到據點附近的熊例外，
+  //  否則牠會無視站在旁邊的玩家繼續埋頭拆牆。
+  //  這裡刻意用位置判斷而不是 b.raiding 旗標：追人時會讓出攻城名額，
+  //  用旗標的話下一幀就被繩索鎖回去，變成追一幀就放棄。
+  if (Math.hypot(b.x - den.x, b.y - den.y) >= CFG.BEAR.denLeash &&
+      Math.hypot(b.x - campCX, b.y - campTopY) >= CFG.BEAR.raidRange) return false;
+  const r = b.plot.rect;
+  const inPlot = p.x > r.x && p.x < r.x + r.w && p.y > r.y && p.y < r.y + r.h;
+  return Math.hypot(p.x - b.x, p.y - b.y) < b.zone.bearAggro || inPlot;
+}
+
 // ---------------- 熊 AI（主動獵殺玩家）----------------
 function updateBears(dt) {
   const p = G.player;
@@ -607,16 +625,18 @@ function updateBears(dt) {
     }
   }
 
-  //  突襲名額：離據點最近的幾隻熊拿到攻城資格，其他的留在自己的獵場。
-  //  有上限才不會變成「一進營地就被三十隻熊推平」，也讓圍攻線攤得開。
+  //  獵殺玩家永遠優先於攻城 —— 追得到人就追人，只有打不到人才去拆據點。
+  //  這一步必須在分配突襲名額「之前」做完，否則正在追人的熊會白白佔著名額。
   const campCX = camp.x + camp.w / 2, campTopY = camp.y;
   const raidRange = playerOutside ? CFG.BEAR.raidRange : CFG.BEAR.raidRangeHiding;
   //  名額要「黏著」：已經在攻城的熊保住位子，一路打到底。
-  //  每幀重新選最近的六隻的話，熊會在半路一直被換掉，然後被熊窩繩索拉回去，
+  //  每幀重新選最近的幾隻的話，熊會在半路一直被換掉，然後被熊窩繩索拉回去，
   //  結果就是一群熊在半路來回走、永遠打不到牆。
   let active = 0;
   const cands = [];
   for (const b of G.bears) {
+    b.hunting = canHunt(b, p, playerOutside, campCX, campTopY);
+    if (b.hunting) { b.raiding = false; continue; }   // 追人的熊讓出攻城名額
     const d = Math.hypot(b.x - campCX, b.y - campTopY);
     if (b.raiding && d < raidRange * 1.35) { active++; continue; }
     b.raiding = false;
@@ -637,17 +657,10 @@ function updateBears(dt) {
     const dpx = p.x - b.x, dpy = p.y - b.y;
     const dp = Math.hypot(dpx, dpy);
 
-    //  主動攻擊：進入感知範圍就追；玩家踏進牠的地塊則無條件追。
-    //  但會被「領地繩索」拉住 —— 離自己的窩太遠就放棄回頭，形成獵場熱點。
+    //  追人 / 攻城的取捨已經在上面的前置迴圈決定好了（追人優先）
     const den = b.plot.den;
     const denDist = Math.hypot(b.x - den.x, b.y - den.y);
-    const inPlot = p.x > b.plot.rect.x && p.x < b.plot.rect.x + b.plot.rect.w &&
-                   p.y > b.plot.rect.y && p.y < b.plot.rect.y + b.plot.rect.h;
-    const hunt = playerOutside && denDist < CFG.BEAR.denLeash &&
-                 (dp < z.bearAggro || inPlot);
-
-    //  追玩家永遠優先於攻城
-    if (hunt) b.raiding = false;
+    const hunt = b.hunting;
     //  每隻熊沿著自己那一路進攻，整群才會攤開成一條攻擊線而不是疊一坨
     const laneX = campCX + b.lane * (camp.w * 0.45);
 
@@ -712,7 +725,8 @@ function updateBears(dt) {
     }
     //  用「貼著牆」而不是「穿進營地」判定攻擊 —— 被推回牆線上的熊
     //  剛好落在邊界外，穿透判定會讓牠們站在那裡完全不打。
-    if (overWall && Math.abs(b.y - wallY) < 5 && b.swingT <= 0) {
+    //  正在追人的熊不打牆 —— 玩家在場時，注意力全部在玩家身上
+    if (!hunt && overWall && Math.abs(b.y - wallY) < 5 && b.swingT <= 0) {
       b.swingT = CFG.BASE.bearSwing * (0.85 + rng() * 0.3);
       b.clawT = 0.3;
       if (G.baseBreakT <= 0) {
