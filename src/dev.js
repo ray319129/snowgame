@@ -41,7 +41,7 @@ function give(value, n) {
 function teleport(x, y) {
   const p = G.player;
   p.x = x; p.y = y; p.vx = p.vy = 0;
-  p.hp = CFG.PLAYER.hpMax;
+  p.hp = val.hpMax();
   p.iframes = CFG.PLAYER.respawnIframes;
   if (!p.alive) { p.alive = true; p.deadT = 0; }
 }
@@ -103,6 +103,7 @@ const BTN = [
   ['物資', [
     ['+30 肉',   () => give(val.meat(CFG.ZONES[0]) * threatMul().meat, 30)],
     ['+30 木頭', () => give(9999, 30)],
+    ['+100 木材', () => { G.wood = Math.min(CFG.WOOD_MAX, G.wood + 100); }],
     ['清空背包', () => { G.player.carry.length = 0; }],
     ['清貨架',   () => { G.shelf.length = 0; G.cash = 0; }],
   ]],

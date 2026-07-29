@@ -21,7 +21,6 @@ export const world = {
   props: [],
   plots: [],
   firepits: [],
-  gate: null,
   campExpand: 0,      // 圍牆等級帶來的營地擴張
 };
 
@@ -159,7 +158,6 @@ export function buildWorld() {
   }
 
   world.firepits = CFG.FIREPITS.map((f, i) => ({ ...f, id: i, progress: 0 }));
-  world.gate = { ...CFG.GATE, progress: CFG.GATE.cost, open: true };
 
   // ---------- 地塊（熊的生成單位）----------
   //  地塊變小 + 每塊上限提高 → 整體密度大幅上升
@@ -179,16 +177,14 @@ export function buildWorld() {
         if (rect.y + rect.h > campTop - 30) continue;
         if (rect.w < 70 || rect.h < 70) continue;
         //  每個地塊有一個熊窩，熊會聚集在它周圍（看得見的獵場熱點）。
-        //  熊窩要避開火堆與迷霧門 —— 否則玩家「退回火堆療傷」等於自殺。
+        //  熊窩要避開火堆 —— 否則玩家「退回火堆療傷」等於自殺。
         let den = null;
         for (let tries = 0; tries < 24; tries++) {
           const cand = {
             x: Math.round(rect.x + rect.w * (0.22 + denRng() * 0.56)),
             y: Math.round(rect.y + rect.h * (0.22 + denRng() * 0.56)),
           };
-          const clash =
-            CFG.FIREPITS.some(f => Math.hypot(cand.x - f.x, cand.y - f.y) < 150) ||
-            Math.hypot(cand.x - CFG.GATE.x, cand.y - CFG.GATE.y) < 110;
+          const clash = CFG.FIREPITS.some(f => Math.hypot(cand.x - f.x, cand.y - f.y) < 150);
           if (!clash) { den = cand; break; }
           if (tries === 23) den = cand;   // 真的擠不下就算了
         }

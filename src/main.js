@@ -6,7 +6,7 @@ import { initInput, pollInput, input, setInputEnabled } from './input.js';
 import { initAudio } from './audio.js';
 import {
   G, initGame, update, val, save, resetSave,
-  nextCost, nextBuildCost, nextWeapon, levelCap, threatLevel,
+  nextCost, nextBuildCost, nextBuildWood, nextWeapon, levelCap, threatLevel,
   pendingMarks, markSpendable, buyMark, doPrestige,
 } from './game.js';
 import { initRender, resizeRender, render, SM } from './render.js';
@@ -19,6 +19,7 @@ const startEl = document.getElementById('start');
 
 const el = {
   money: document.getElementById('moneyVal'),
+  wood:  document.getElementById('woodVal'),
   warmF: document.getElementById('warmFill'),
   warmT: document.getElementById('warmTxt'),
   loadF: document.getElementById('loadFill'),
@@ -121,7 +122,11 @@ function renderPanel() {
     cur  = buildLabel(pad.key, lv);
     next = lv < b.max ? buildLabel(pad.key, lv + 1) : null;
     cost = nextBuildCost(pad.key);
-    ok   = G.money >= cost;
+    const wood = nextBuildWood(pad.key);
+    ok   = G.money >= cost && G.wood >= wood;
+    if (wood > 0 && lv < b.max) {
+      desc += `　需要木材 ${wood}（庫存 ${G.wood}）`;
+    }
   } else if (pad.kind === 'weapon') {
     const w = nextWeapon(), cw = val.weapon();
     name = w ? `武器：${w.name}` : `武器：${cw.name}`;
@@ -203,7 +208,7 @@ function renderModal() {
 }
 
 // ---------------- HUD ----------------
-let hudMoney = -1, hudCap = -1, hudCarry = -1, hudZone = -1, hudThreat = -1;
+let hudMoney = -1, hudCap = -1, hudCarry = -1, hudZone = -1, hudThreat = -1, hudWood = -1;
 const inCampNow = (p) => {
   const c = CFG.CAMP, e = 0;
   return p.x > c.x - e && p.x < c.x + c.w + e && p.y > c.y - e && p.y < c.y + c.h + e;
@@ -214,6 +219,7 @@ function updateHud() {
 
   const m = Math.floor(G.money);
   if (m !== hudMoney) { hudMoney = m; el.money.textContent = abbr(m); }
+  if (G.wood !== hudWood) { hudWood = G.wood; el.wood.textContent = G.wood; }
 
   const hpMax = val.hpMax();
   const w = Math.max(0, p.hp) / hpMax;

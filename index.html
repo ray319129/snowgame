@@ -35,6 +35,20 @@
   #money .c{width:11px;height:11px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe98a,#f0b429 60%,#a8760f);box-shadow:0 0 0 1px #6b4a0c}
   #moneyVal{color:#ffd651;font-size:15px}
 
+  /* 木材庫存：跟金錢並排，蓋東西要看它 */
+  #woodBox{
+    display:flex;align-items:center;gap:5px;
+    background:linear-gradient(#20283c,#151b2b);
+    border:2px solid #3b465f;border-radius:3px;
+    padding:4px 9px 4px 7px;font-weight:800;letter-spacing:.5px;
+    font-variant-numeric:tabular-nums;
+    box-shadow:0 2px 0 #0c1020, inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  #woodBox .lg{width:12px;height:9px;border-radius:2px;
+    background:linear-gradient(90deg,#d9a882 0 30%,#8d6539 30%);box-shadow:0 0 0 1px #4b3320}
+  #woodVal{color:#d9a882;font-size:15px}
+  #woodBox.low #woodVal{color:#ff9d7a}
+
   /* 金框 + 圓形徽章的像素風血條（參考 血量條 素材） */
   .bar{position:relative;height:13px;border:2px solid #c9992c;border-radius:0;
     background:#3a3550;overflow:hidden;
@@ -179,7 +193,10 @@
     <div id="cold"></div>
     <div id="dead"></div>
     <div id="top">
-      <div id="money"><span class="c"></span><span id="moneyVal">0</span></div>
+      <div class="row" style="gap:5px">
+        <div id="money"><span class="c"></span><span id="moneyVal">0</span></div>
+        <div id="woodBox"><span class="lg"></span><span id="woodVal">0</span></div>
+      </div>
       <div id="bars">
         <div class="row"><span class="lbl">血</span><div class="bar"><i id="warmFill"></i><b id="warmTxt">100</b></div></div>
         <div class="row"><span class="lbl">背</span><div class="bar"><i id="loadFill"></i><b id="loadTxt">0/6</b></div></div>

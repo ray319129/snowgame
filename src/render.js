@@ -5,9 +5,9 @@
 import { CFG, buildValue, WOOD_MARKER } from './config.js';
 import { ART, BEAR_SPRITES, BUILD_ICON, WEAPON_SPRITE } from './art.js';
 import { px, flipX, drawText, drawTextC, textWidth, abbr } from './pixel.js';
-import { world, PROP_SPRITE, inCamp, campRect } from './world.js';
+import { world, PROP_SPRITE, inCamp, campRect, makeRng } from './world.js';
 import {
-  G, val, nextCost, nextBuildCost, nextWeapon, zoneLocked, pendingMarks, countWood,
+  G, val, nextCost, nextBuildCost, nextBuildWood, nextWeapon, pendingMarks, countWood,
 } from './game.js';
 import { input } from './input.js';
 
@@ -30,6 +30,7 @@ export function initRender(canvas) {
   ctx.imageSmoothingEnabled = false;
   lcv = document.createElement('canvas');
   lctx = lcv.getContext('2d');
+  initSnow();
 }
 
 export function resizeRender(w, h) {
@@ -63,6 +64,93 @@ const S  = (x) => Math.round(x - cam.x);
 const SY = (y) => Math.round(y - cam.y);
 
 // ============================================================
+//  環境動畫：飄雪、極光、腳印
+//  全部走「固定池 + 純函數位移」，不做每幀配置，才不會拖垮渲染。
+// ============================================================
+
+//  飄雪：螢幕空間的固定池，飄出畫面就繞回來。
+//  不跟世界座標綁定 —— 玩家只會看到「一直在下雪」，不會發現雪是假的。
+const SNOW_N = 64;
+const snow = [];
+function initSnow() {
+  snow.length = 0;
+  const r = makeRng(0xC0FFEE);
+  for (let i = 0; i < SNOW_N; i++) {
+    snow.push({
+      x: r() * 260, y: r() * 560,
+      spd: 8 + r() * 20,          // 落下速度
+      drift: 0.4 + r() * 1.2,     // 左右擺盪幅度
+      ph: r() * 7,                // 擺盪相位
+      size: r() > 0.72 ? 2 : 1,   // 少數大片雪
+      a: 0.35 + r() * 0.5,
+    });
+  }
+}
+
+function drawSnow(dt) {
+  ctx.save();
+  for (const f of snow) {
+    f.y += f.spd * dt;
+    if (f.y > VH + 4) { f.y = -4; f.x = (f.x * 7.13 + 91) % (VW + 8); }
+    const x = f.x + Math.sin(G.time * 1.7 + f.ph) * f.drift * 6;
+    ctx.globalAlpha = f.a;
+    ctx.fillStyle = f.size > 1 ? '#ffffff' : '#dbe7f5';
+    ctx.fillRect(Math.round(x), Math.round(f.y), f.size, f.size);
+  }
+  ctx.restore();
+}
+
+//  極光：只在北區上空出現。這是「敢往北走」的視覺獎勵，
+//  也是 Zone 2 唯一擁有的景觀 —— 玩家會為了看它而北上。
+function drawAurora() {
+  const skyBottom = CFG.ZONES[0].y0;          // 北區的下緣
+  const sy = SY(skyBottom);
+  if (sy < -40) return;                        // 分界線在畫面上方 → 人已在南區
+  //  分界線越靠近畫面下緣（甚至在畫面外），代表越深入北方，極光就越強。
+  const strength = Math.max(0, Math.min(1, sy / VH));
+  if (strength <= 0.02) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let band = 0; band < 3; band++) {
+    const baseY = SY(70 + band * 58);
+    if (baseY < -80 || baseY > VH + 40) continue;
+    const hue = band === 0 ? '120,230,190' : band === 1 ? '110,190,240' : '170,140,230';
+    const t = G.time * (0.22 + band * 0.06) + band * 2.1;
+    ctx.beginPath();
+    for (let x = -8; x <= VW + 8; x += 8) {
+      const wx = x + cam.x;
+      const y = baseY
+        + Math.sin(wx * 0.012 + t) * 16
+        + Math.sin(wx * 0.031 - t * 1.4) * 7;
+      x === -8 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    // 帶狀漸層：上緣亮、往下淡出
+    const g = ctx.createLinearGradient(0, baseY - 26, 0, baseY + 34);
+    g.addColorStop(0, `rgba(${hue},0)`);
+    g.addColorStop(0.45, `rgba(${hue},${0.30 * strength})`);
+    g.addColorStop(1, `rgba(${hue},0)`);
+    ctx.strokeStyle = g;
+    ctx.lineWidth = 26 + Math.sin(t * 0.8) * 6;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+//  腳印：玩家與熊走過雪地會留下淡淡的印子，過幾秒淡掉。
+//  這是最便宜的「世界有被我影響」的訊號。
+//  資料放在 G.prints（由 game.js 產生與淡出），這裡只負責畫。
+function drawPrints() {
+  ctx.save();
+  ctx.fillStyle = '#8fa4c0';
+  for (const p of G.prints) {
+    ctx.globalAlpha = Math.min(0.3, p.life / CFG.PRINT_LIFE * 0.3);
+    ctx.fillRect(S(p.x), SY(p.y), p.size, Math.max(1, p.size - 1));
+  }
+  ctx.restore();
+}
+
+// ============================================================
 export function render(dt) {
   const p = G.player;
 
@@ -79,6 +167,7 @@ export function render(dt) {
   ctx.fillRect(0, 0, VW, VH);
   ctx.drawImage(world.ground, cam.x, cam.y, VW, VH, 0, 0, VW, VH);
 
+  drawPrints();            // 腳印壓在地上，所有東西之下
   drawGroundOverlays();
 
   // ---- 收集可排序的繪製物 ----
@@ -132,6 +221,10 @@ export function render(dt) {
   drawFloats();
 
   drawLighting();
+
+  //  極光壓在光照之上（它本身就是光），飄雪再蓋在最上層
+  drawAurora();
+  drawSnow(dt);
 
   drawScreenUI();
 }
@@ -214,9 +307,12 @@ function drawProp(pr) {
       spr(PROP_SPRITE.tree(), pr.x, pr.y, 0.28);
       return;
     }
+    //  風吹搖曳：每棵樹用自己的座標當相位，整片林子就不會同步擺動。
+    //  幅度只有 1px —— 像素風裡這樣就足夠讀成「風在吹」。
+    const sway = Math.sin(G.time * 1.1 + pr.x * 0.07 + pr.y * 0.03) * 0.9;
     const a = 0.5 + 0.5 * (pr.hp / pr.maxHp);
     shadow(pr.x, pr.y - 1, 7, 3, 0.22);
-    spr(PROP_SPRITE.tree(), pr.x, pr.y, a);
+    spr(PROP_SPRITE.tree(), pr.x + sway, pr.y, a);
     return;
   }
   shadow(pr.x, pr.y - 1, 6, 3, 0.22);
@@ -335,10 +431,11 @@ function drawWoodYard(wz) {
       maxW: 4, narrow: 0.35, colW: 5.4, rowH: 3.2,
     });
   }
-  // 基地缺血時提示「拿木頭來修」，滿血時顯示賣價
+  // 依照木頭當下的去向給提示：修基地 → 存建材 → 滿了換錢
   const hurt = G.baseHp < G.baseMaxHp;
-  drawTextC(ctx, hurt ? '修基地' : '$' + CFG.TREE.value,
-            S(wz.x), SY(wz.y) + 13, hurt ? '#9fe8a0' : '#ffd651');
+  const full = G.wood >= CFG.WOOD_MAX;
+  drawTextC(ctx, hurt ? '修基地' : full ? '$' + CFG.TREE.value : G.wood + '/' + CFG.WOOD_MAX,
+            S(wz.x), SY(wz.y) + 13, hurt ? '#9fe8a0' : full ? '#ffd651' : '#c98f4e');
 }
 
 function drawRack(r) {
@@ -437,7 +534,6 @@ function drawPad(pad) {
   drawTextC(ctx, 'LV' + lv, S(pad.x), SY(pad.y) - 30, '#cfe0f7');
 
   if (lv >= CFG.UPG[pad.key].max) drawTextC(ctx, 'MAX', S(pad.x), SY(pad.y) + 10, '#8fa0bd');
-  else if (zoneLocked(pad.key)) lockIcon(pad);
   else {
     const cost = nextCost(pad.key);
     drawTextC(ctx, '$' + abbr(cost), S(pad.x), SY(pad.y) + 10, G.money >= cost ? '#ffd651' : '#7a8298');
@@ -451,21 +547,15 @@ function drawBuildPad(pad) {
   const lv = G.build[pad.key];
   drawTextC(ctx, 'LV' + lv, S(pad.x), SY(pad.y) - 30, '#cfe0f7');
   const cost = nextBuildCost(pad.key);
-  if (!isFinite(cost)) drawTextC(ctx, 'MAX', S(pad.x), SY(pad.y) + 10, '#8fa0bd');
-  else drawTextC(ctx, '$' + abbr(cost), S(pad.x), SY(pad.y) + 10, G.money >= cost ? '#9fe8a0' : '#7a8298');
-}
-
-function lockIcon(pad) {
-  const t = (Math.sin(G.time * 3 + pad.x) + 1) / 2;
-  ctx.save();
-  ctx.globalAlpha = 0.75 + t * 0.25;
-  ctx.fillStyle = '#14101a'; ctx.fillRect(S(pad.x) - 4, SY(pad.y) + 8, 8, 6);
-  ctx.fillStyle = '#ffb648'; ctx.fillRect(S(pad.x) - 3, SY(pad.y) + 9, 6, 4);
-  ctx.fillStyle = '#14101a';
-  ctx.fillRect(S(pad.x) - 3, SY(pad.y) + 5, 6, 1);
-  ctx.fillRect(S(pad.x) - 3, SY(pad.y) + 6, 1, 2);
-  ctx.fillRect(S(pad.x) + 2, SY(pad.y) + 6, 1, 2);
-  ctx.restore();
+  if (!isFinite(cost)) { drawTextC(ctx, 'MAX', S(pad.x), SY(pad.y) + 10, '#8fa0bd'); return; }
+  drawTextC(ctx, '$' + abbr(cost), S(pad.x), SY(pad.y) + 10, G.money >= cost ? '#9fe8a0' : '#7a8298');
+  // 木造建築額外標出木材需求，缺料時變紅
+  const wood = nextBuildWood(pad.key);
+  if (wood > 0) {
+    const ok = G.wood >= wood;
+    spr(ART.woodLog, pad.x - 7, pad.y + 26);
+    drawText(ctx, '' + wood, S(pad.x) - 1, SY(pad.y) + 18, ok ? '#c98f4e' : '#ff8a5c');
+  }
 }
 
 function drawMeat(d) {

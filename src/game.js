@@ -2,7 +2,7 @@
 //  遊戲狀態與模擬。固定時間步 60Hz。
 // ============================================================
 import {
-  CFG, upgCost, upgValue, buildCost, buildValue, markCost,
+  CFG, upgCost, upgValue, buildCost, buildValue, buildWood, markCost,
   zoneAt, upgCapFor, WOOD_MARKER,
 } from './config.js';
 import { world, buildWorld, inCamp, campRect, makeRng } from './world.js';
@@ -42,6 +42,7 @@ export const G = {
   drops: [],
   fx: [],
   floats: [],
+  prints: [],                  // 雪地腳印（純視覺，不存檔）
 
   // 據點（base.js 管理）
   shelf: [],
@@ -57,6 +58,7 @@ export const G = {
   cashTimer: 0, cashStreak: 0, cashStreakT: 0,
   shelfTimer: 0,
   woodTimer: 0,
+  wood: 0,                     // 木材庫存：拿來蓋東西的資源
   woodPile: 0,                 // 木材場上堆著的木頭（純視覺，會慢慢被運走）
 
   //  箭塔搬遷：扛在身上的塔（索引）與蓄力進度
@@ -98,6 +100,7 @@ export function save() {
       stats: G.stats,
       shelf: G.shelf, cash: G.cash,
       baseHp: G.baseHp,
+      wood: G.wood,
       towerPos: G.towerPos,
       // 玩家身上的東西也要存，不然重整就掉背包
       player: p ? { x: p.x, y: p.y, hp: p.hp, carry: p.carry } : null,
@@ -135,11 +138,10 @@ function load() {
     G.shelf = d.shelf || [];
     G.cash = d.cash || 0;
     G.baseHp = d.baseHp || CFG.BASE.hp;
+    G.wood = d.wood || 0;
     G.towerPos = Array.isArray(d.towerPos) ? d.towerPos : null;
     G.savedPlayer = d.player || null;
     if (d.fire) d.fire.forEach((lit, i) => { if (world.firepits[i]) world.firepits[i].lit = lit; });
-    world.gate.open = true;
-    world.gate.progress = CFG.GATE.cost;
   } catch (e) { /* 壞檔就當新玩家 */ }
 }
 
@@ -192,17 +194,11 @@ export function threatMul(t = threatLevel()) {
   };
 }
 
-/** 這條升級線在目前區域的等級上限 */
+/** 這條升級線的等級上限（區域上限已移除，就是 max） */
 export function levelCap(key) { return upgCapFor(G.zonesOpen, key); }
-export function zoneLocked(key) {
-  return G.upg[key] >= levelCap(key) && G.upg[key] < CFG.UPG[key].max;
-}
 export function nextCost(key) {
   if (G.upg[key] >= levelCap(key)) return Infinity;
   return upgCost(key, G.upg[key]);
-}
-export function allLocked() {
-  return Object.keys(CFG.UPG).every(k => G.upg[k] >= levelCap(k));
 }
 export function nextBuildCost(key) {
   if (G.build[key] >= CFG.BUILD[key].max) return Infinity;
@@ -443,6 +439,7 @@ export function update(dt, inp) {
     updateTrees(dt);
     updateBase(dt);
     updateFx(dt);
+    updatePrints(dt);
     return;
   }
 
@@ -460,6 +457,31 @@ export function update(dt, inp) {
   updateTrees(dt);
   updateBase(dt);
   updateFx(dt);
+  updatePrints(dt);
+}
+
+//  走在雪地上會留下腳印。用「累積距離」而不是計時器，
+//  這樣走快走慢的間距才會一致。
+function trackPrints(e, dt, size, spread) {
+  const sp = Math.hypot(e.vx, e.vy);
+  if (sp < 12) return;
+  e.printD = (e.printD || 0) + sp * dt;
+  if (e.printD < 13) return;
+  e.printD = 0;
+  e.printSide = !e.printSide;
+  const nx = -e.vy / sp, ny = e.vx / sp;          // 移動方向的法線 → 左右腳
+  const s = e.printSide ? spread : -spread;
+  if (G.prints.length >= CFG.PRINT_MAX) G.prints.shift();
+  G.prints.push({
+    x: Math.round(e.x + nx * s), y: Math.round(e.y + ny * s - 1),
+    size, life: CFG.PRINT_LIFE,
+  });
+}
+
+function updatePrints(dt) {
+  for (let i = G.prints.length - 1; i >= 0; i--) {
+    if ((G.prints[i].life -= dt) <= 0) G.prints.splice(i, 1);
+  }
 }
 
 function updateMove(dt, p, inp) {
@@ -487,6 +509,8 @@ function updateMove(dt, p, inp) {
   const R = CFG.PLAYER.radius;
   p.x = Math.max(R, Math.min(CFG.WORLD.w - R, p.x));
   p.y = Math.max(R + 8, Math.min(CFG.WORLD.h - R, p.y));
+
+  if (!inCamp(p.x, p.y)) trackPrints(p, dt, 2, 2.5);   // 營地是木地板，不留印
 }
 
 // ---------------- 血量與失溫 ----------------
@@ -793,6 +817,10 @@ function updateBears(dt) {
     }
     b.x = Math.max(12, Math.min(CFG.WORLD.w - 12, b.x));
     b.y = Math.max(24, Math.min(CFG.WORLD.h - 12, b.y));
+    //  只有離玩家近的熊才記腳印 —— 遠處的看不到，記了只是浪費池子
+    if (Math.abs(b.x - p.x) < 140 && Math.abs(b.y - p.y) < 200) {
+      trackPrints(b, dt, b.variant.id === 'rage' ? 3 : 2, 3.5);
+    }
 
     if (p.alive && b.hitT <= 0 && p.iframes <= 0 &&
         dp < b.radius + CFG.PLAYER.radius + 3 && playerOutside) {
@@ -1004,6 +1032,33 @@ export function saveTowerPos() {
   G.towerPos = G.towers.map(t => ({ x: Math.round(t.x), y: Math.round(t.y) }));
 }
 
+/**
+ * 一根木頭進到木材場的去向，優先序固定：
+ *   1. 基地有傷 → 修基地（保命最優先）
+ *   2. 庫存沒滿 → 存起來當建材
+ *   3. 庫存滿了 → 直接換錢（永遠不會浪費）
+ * 給玩家與搬運工共用，兩邊規則才不會分岔。
+ */
+export function depositWood(fx, fy, p = null) {
+  G.woodPile = Math.min(60, G.woodPile + 1);
+  if (G.baseHp < G.baseMaxHp) {
+    G.baseHp = Math.min(G.baseMaxHp, G.baseHp + CFG.TREE.hpRepair);
+    float(fx + (rng() - 0.5) * 14, fy - 26, '+' + CFG.TREE.hpRepair + ' 基地', '#9fe8a0');
+    burst(fx, fy - 8, 4, '#9fe8a0', 38);
+    SFX.pickup(4);
+  } else if (G.wood < CFG.WOOD_MAX) {
+    G.wood++;
+    float(fx + (rng() - 0.5) * 14, fy - 26, '+1 木材', '#c98f4e');
+    SFX.pickup(3);
+  } else {
+    earn(CFG.TREE.value);
+    G.cashStreak++; G.cashStreakT = 0.6;
+    SFX.sell(G.cashStreak);
+    if (p) coinFly(fx, fy - 14, p.x, p.y - 20, 'coin');
+    float(fx + (rng() - 0.5) * 16, fy - 26, '+$' + CFG.TREE.value, '#ffd651');
+  }
+}
+
 // ---------------- 站立觸發區 ----------------
 function updateTriggers(dt, p) {
   // ---- 貨架：只收肉 ----
@@ -1033,19 +1088,7 @@ function updateTriggers(dt, p) {
       if (i < 0) break;
       G.woodTimer += CFG.SELL_INTERVAL;
       p.carry.splice(i, 1);
-      if (G.baseHp < G.baseMaxHp) {
-        G.baseHp = Math.min(G.baseMaxHp, G.baseHp + CFG.TREE.hpRepair);
-        float(wd.x + (rng() - 0.5) * 14, wd.y - 26, '+' + CFG.TREE.hpRepair + ' 基地', '#9fe8a0');
-        burst(wd.x, wd.y - 8, 4, '#9fe8a0', 38);
-        SFX.pickup(4);
-      } else {
-        G.woodPile = Math.min(60, G.woodPile + 1);
-        earn(CFG.TREE.value);
-        G.cashStreak++; G.cashStreakT = 0.6;
-        SFX.sell(G.cashStreak);
-        coinFly(wd.x, wd.y - 14, p.x, p.y - 20, 'coin');
-        float(wd.x + (rng() - 0.5) * 16, wd.y - 26, '+$' + CFG.TREE.value, '#ffd651');
-      }
+      depositWood(wd.x, wd.y, p);
     }
   } else {
     G.woodTimer = 0;
@@ -1098,7 +1141,7 @@ function updateTriggers(dt, p) {
   for (const f of world.firepits) {
     if (f.lit) continue;
     if (Math.hypot(p.x - f.x, p.y - f.y) < CFG.COLD.fireRadius * 0.7) {
-      const pay = Math.min(f.cost - f.progress, CFG.GATE_DRAIN * 0.6 * dt, G.money);
+      const pay = Math.min(f.cost - f.progress, CFG.FIRE_DRAIN * dt, G.money);
       if (pay > 0) {
         f.progress += pay; G.money -= pay;
         if (rng() < 0.3) coinFly(p.x, p.y - 14, f.x, f.y - 8);
@@ -1127,7 +1170,9 @@ function findPad(p) {
 
 function padAffordable(pad) {
   if (pad.kind === 'upg')   return G.money >= nextCost(pad.key);
-  if (pad.kind === 'build') return G.money >= nextBuildCost(pad.key);
+  if (pad.kind === 'build') {
+    return G.money >= nextBuildCost(pad.key) && G.wood >= nextBuildWood(pad.key);
+  }
   if (pad.kind === 'weapon') { const w = nextWeapon(); return !!w && G.money >= w.cost; }
   return false;
 }
@@ -1160,10 +1205,17 @@ export function buy(key) {
   return true;
 }
 
+export function nextBuildWood(key) {
+  if (G.build[key] >= CFG.BUILD[key].max) return 0;
+  return buildWood(key, G.build[key]);
+}
+
 export function build(key) {
   const cost = nextBuildCost(key);
-  if (!isFinite(cost) || G.money < cost) return false;
+  const wood = nextBuildWood(key);
+  if (!isFinite(cost) || G.money < cost || G.wood < wood) return false;
   G.money -= cost;
+  G.wood -= wood;
   G.build[key]++;
   SFX.upgradeBig(); G.flash = 0.5; G.shake = 3;
   const q = CFG.BUILD_PADS.find(o => o.key === key);
@@ -1207,9 +1259,9 @@ export function doPrestige() {
   G.drops.length = 0;
   G.baseHp = CFG.BASE.hp;
   G.baseBreakT = 0;
+  G.wood = 0;
+  G.woodPile = 0;
 
-  world.gate.open = true;
-  world.gate.progress = CFG.GATE.cost;
   world.firepits.forEach((f, i) => { f.lit = CFG.FIREPITS[i].lit; f.progress = 0; });
 
   initBase();

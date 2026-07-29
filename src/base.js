@@ -5,7 +5,7 @@
 import { CFG, buildValue, WOOD_MARKER } from './config.js';
 import { world, inCamp, campRect, setCampExpand } from './world.js';
 import { SFX } from './audio.js';
-import { G, val, burst, float, coinFly, killBear, rng } from './game.js';
+import { G, val, burst, float, coinFly, killBear, rng, depositWood } from './game.js';
 
 // ---------------- 貨架 ----------------
 export function shelfSpace() { return Math.max(0, val.shelfMax() - G.shelf.length); }
@@ -263,14 +263,7 @@ function updateHauler(h, dt, cx, cy) {
         if (wood) {
           h.dropT += 0.08;
           h.carry.pop();
-          if (G.baseHp < G.baseMaxHp) {
-            G.baseHp = Math.min(G.baseMaxHp, G.baseHp + CFG.TREE.hpRepair);
-            float(dest.x, dest.y - 26, '+' + CFG.TREE.hpRepair + ' 基地', '#9fe8a0');
-          } else {
-            G.woodPile = Math.min(60, G.woodPile + 1);
-            G.cash += CFG.TREE.value;
-            coinFly(h.x, h.y - 14, CFG.CASH.x, CFG.CASH.y - 6, 'bill');
-          }
+          depositWood(dest.x, dest.y);   // 跟玩家共用同一套優先序
         } else if (shelfSpace() > 0) {
           h.dropT += 0.08;
           depositMeat(h.carry.pop());

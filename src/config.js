@@ -24,8 +24,6 @@ export const CFG = {
   //  木材場：跟肉分開的第二條產線（修基地 / 直接換錢）
   WOOD:  { x: 276, y: 1292, r: 24 },
 
-  GATE: { x: 380, y: 690, r: 38, cost: 220 },
-
   // ---- 基地（據點）----
   //  熊用「一次一爪」而不是持續掉血 —— 看得見、聽得見、才有威脅感
   BASE: {
@@ -118,13 +116,17 @@ export const CFG = {
   },
 
   // ---- 區域 ----
+  //  兩區的關鍵指標是「每點熊血能換到多少錢」＝ drops × meat / bearHp。
+  //  舊數值 Z1 0.60 / Z2 0.69 —— 北方只多 15%，卻要多吃 1.5 倍失溫與 1.7 倍熊傷，
+  //  理性玩家會永遠待在南方，等於整個北區白做。
+  //  現在拉到 Z1 0.60 / Z2 2.03（3.4 倍），北上才是真正的收入躍升。
   ZONES: [
     { id: 1, name: '冰原邊緣', tag: 'ZONE 1', y0: 650, y1: 1560,
       cold: 1.0, dark: 0.10,
       bearHp: 10, bearSpd: 48, bearAggro: 165, bearDmg: 7, meat: 2, drops: 3 },
     { id: 2, name: '裂冰灣', tag: 'ZONE 2', y0: -50, y1: 650,
       cold: 1.5, dark: 0.52,
-      bearHp: 65, bearSpd: 60, bearAggro: 200, bearDmg: 12, meat: 15, drops: 3 },
+      bearHp: 65, bearSpd: 60, bearAggro: 200, bearDmg: 12, meat: 33, drops: 4 },
   ],
 
   // ---- 熊 ----
@@ -197,15 +199,24 @@ export const CFG = {
 
   // ---- 據點建設 ----
   //  每項有多個等級，逐級變強；效果全部「看得見」
+  //  wood：升這一級需要的木材（× 目前等級＋1）。木造建築才吃木材，
+  //  僱人不用。這讓砍樹在後期還有意義 —— 不然木頭賣的錢會被肉價完全輾過。
   BUILD: {
     //  貨架容量必須永遠大於背包容量，否則卸貨會卸不完，體感很差
-    shelf:   { name: '貨架',     desc: '能擺放的肉量',       base: 60,   g: 1.55, max: 8, start: 20, per: 14 },
-    counter: { name: '收銀台',   desc: '同時排隊的顧客數',   base: 140,  g: 1.85, max: 5, start: 3,  per: 1  },
-    wall:    { name: '圍牆',     desc: '擴大營地安全範圍',   base: 260,  g: 2.10, max: 4, start: 0,  per: 18 },
-    tower:   { name: '箭塔',     desc: '自動射擊靠近的熊',   base: 600,  g: 2.20, max: 4, start: 0,  per: 1  },
-    hauler:  { name: '搬運工',   desc: '自動把地上的肉送回', base: 800,  g: 2.30, max: 4, start: 0,  per: 1  },
-    hunter:  { name: '獵人助手', desc: '自動獵殺野外的熊',   base: 2400, g: 2.45, max: 4, start: 0,  per: 1  },
+    shelf:   { name: '貨架',     desc: '能擺放的肉量',       base: 60,   g: 1.55, max: 8, start: 20, per: 14, wood: 5  },
+    counter: { name: '收銀台',   desc: '同時排隊的顧客數',   base: 140,  g: 1.85, max: 5, start: 3,  per: 1,  wood: 7  },
+    wall:    { name: '圍牆',     desc: '擴大營地安全範圍',   base: 260,  g: 2.10, max: 4, start: 0,  per: 18, wood: 12 },
+    tower:   { name: '箭塔',     desc: '自動射擊靠近的熊',   base: 600,  g: 2.20, max: 4, start: 0,  per: 1,  wood: 18 },
+    hauler:  { name: '搬運工',   desc: '自動把地上的肉送回', base: 800,  g: 2.30, max: 4, start: 0,  per: 1,  wood: 0  },
+    hunter:  { name: '獵人助手', desc: '自動獵殺野外的熊',   base: 2400, g: 2.45, max: 4, start: 0,  per: 1,  wood: 0  },
   },
+
+  //  木材庫存上限。滿了之後多的木頭會自動換成錢，不會浪費。
+  WOOD_MAX: 220,
+
+  // ---- 雪地腳印 ----
+  PRINT_MAX: 56,
+  PRINT_LIFE: 4.5,
 
   // ---- 顧客 ----
   CUSTOMER: {
@@ -235,7 +246,7 @@ export const CFG = {
 
   SELL_INTERVAL: 0.055,     // 玩家把肉放上貨架的速度
   CASH_PICK: 0.045,         // 撿現金的速度
-  GATE_DRAIN: 90,           // $/s 流入迷霧門（要慢到有「儀式感」）
+  FIRE_DRAIN: 54,           // $/s 流入火堆（要慢到有「儀式感」）
 
   SAVE_KEY: 'frostline_save',
   SAVE_VERSION: 3,
@@ -263,6 +274,11 @@ export function upgValue(key, level) {
 export function buildCost(key, level) {
   const b = CFG.BUILD[key];
   return Math.round(b.base * Math.pow(b.g, level));
+}
+/** 升這一級需要的木材（隨等級線性成長，不像錢那樣指數爆炸） */
+export function buildWood(key, level) {
+  const b = CFG.BUILD[key];
+  return b.wood ? b.wood * (level + 1) : 0;
 }
 export function buildValue(key, level) {
   const b = CFG.BUILD[key];
