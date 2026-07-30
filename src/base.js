@@ -77,7 +77,7 @@ function makeHelper(kind, i) {
     vx: 0, vy: 0, face: 1, walkT: 0,
     state: 'idle', target: null, carry: [], atkT: 0,
     mode: 'gather', dropT: 0,
-    tree: null, load: 0, swing: 0,
+    tree: null, load: 0, goal: 0, swing: 0,
   };
 }
 
@@ -246,27 +246,16 @@ function updateHelpers(dt) {
   }
 }
 
-// ---------------- 伐木工：砍樹 → 把木材送回木材場 ----------------
+// ---------------- 伐木工：只負責砍 ----------------
+//  砍倒的木頭留在地上，由搬運工撿回來 —— 分工是刻意的：
+//  伐木工不碰木頭也不碰肉，搬運才是搬運工的活。
 //  傷害跟著玩家的武器威力走，所以升級「武器威力」也等於升級整支伐木隊。
 function updateChopper(h, dt, cx, cy) {
   const H = CFG.HELPER;
 
-  // 背滿了就送回木材場
-  if (h.carry.length >= haulerCarry()) {
-    const arrived = moveTo(h, CFG.WOOD.x, CFG.WOOD.y + 16, H.chopSpd, dt);
-    if (arrived || Math.hypot(h.x - CFG.WOOD.x, h.y - CFG.WOOD.y) < 22) {
-      h.dropT = Math.max(-0.08, (h.dropT || 0) - dt);
-      while (h.dropT <= 0 && h.carry.length > 0) {
-        h.dropT += 0.08;
-        h.carry.pop();
-        depositWood(CFG.WOOD.x, CFG.WOOD.y);
-      }
-    }
-    return;
-  }
-
-  // 找一棵活著的樹
-  if (!h.tree || h.tree.deadT > 0 || h.tree.hp <= 0) {
+  // 找一棵活著的樹（owner 避免整隊擠同一棵）
+  if (!h.tree || h.tree.deadT > 0 || h.tree.hp <= 0 || h.tree.owner !== h) {
+    if (h.tree && h.tree.owner === h) h.tree.owner = null;
     h.tree = null;
     let bd = H.haulRange;
     for (const pr of world.props) {
@@ -278,12 +267,7 @@ function updateChopper(h, dt, cx, cy) {
     }
     if (h.tree) h.tree.owner = h;
   }
-  if (!h.tree) {
-    // 沒樹可砍就先把身上的送回去，不然會站著發呆
-    if (h.carry.length > 0) { h.carry.length = Math.min(h.carry.length, haulerCarry()); h.carry.push(WOOD_MARKER); h.carry.pop(); }
-    moveTo(h, cx - 60, cy + 30, 40, dt);
-    return;
-  }
+  if (!h.tree) { moveTo(h, cx - 60, cy + 30, 40, dt); return; }
 
   const d = Math.hypot(h.x - h.tree.x, h.y - h.tree.y);
   if (d > 14) { moveTo(h, h.tree.x, h.tree.y + 6, H.chopSpd, dt); return; }
@@ -293,50 +277,70 @@ function updateChopper(h, dt, cx, cy) {
   if (h.atkT <= 0) {
     h.atkT = 0.55;
     h.swing = 0.2;
-    const before = G.drops.length;
-    const felled = damageTree(h.tree, val.power() * CFG.HELPER.chopperPower * (1 + h.i * 0.08));
-    if (felled) {
-      // 樹倒了：把剛掉出來的木頭直接收進背包，省得再走一趟
-      h.tree.owner = null;
+    if (damageTree(h.tree, val.power() * H.chopperPower * (1 + h.i * 0.08))) {
+      h.tree.owner = null;      // 樹倒了，木頭留給搬運工
       h.tree = null;
-      for (let i = G.drops.length - 1; i >= before; i--) {
-        if (h.carry.length >= haulerCarry()) break;
-        if (G.drops[i].value !== WOOD_MARKER) continue;
-        h.carry.push(WOOD_MARKER);
-        G.drops.splice(i, 1);
-      }
     }
   }
   if (h.swing > 0) h.swing -= dt;
 }
 
-// ---------------- 收銀機器人：自動把收銀台的現金收進口袋 ----------------
+// ---------------- 收銀機器人（買斷制，只有一台）----------------
+//  行為：長駐收銀台旁邊持續吸錢，「裝滿一趟」才走去入帳。
+//  目標量在每趟開始時鎖定，而且不會超過當下檯面上的現金 ——
+//  否則錢不夠時機器人會抱著半趟的錢永遠站在那裡。
 function updateRobot(h, dt, cx, cy) {
   const H = CFG.HELPER;
   const cash = CFG.CASH;
 
-  if (h.load > 0) {
-    // 載滿了送去「入帳」（走到營火旁邊當作回報點）
+  // ---- 回程：把這一趟的錢入帳 ----
+  if (h.mode === 'deliver') {
     const t = CFG.CAMPFIRE;
-    const arrived = moveTo(h, t.x, t.y + 14, H.robotSpd, dt);
+    const arrived = moveTo(h, t.x, t.y + 16, H.robotSpd, dt);
     if (arrived || Math.hypot(h.x - t.x, h.y - t.y) < 20) {
-      earn(h.load);
-      float(h.x, h.y - 26, '+$' + abbr(Math.round(h.load)), '#ffd651');
-      coinFly(h.x, h.y - 14, t.x, t.y - 10, 'coin');
-      SFX.sell(2);
-      h.load = 0;
+      if (h.load > 0) {
+        earn(h.load);
+        float(h.x, h.y - 28, '+$' + abbr(Math.round(h.load)), '#ffd651');
+        coinFly(h.x, h.y - 14, t.x, t.y - 10, 'coin');
+        SFX.sell(3);
+      }
+      h.load = 0; h.goal = 0; h.mode = 'gather';
     }
     return;
   }
 
-  if (G.cash <= 0) { moveTo(h, cx + 60, cy + 30, 40, dt); return; }
-  const arrived = moveTo(h, cash.x, cash.y + 14, H.robotSpd, dt);
-  if (arrived || Math.hypot(h.x - cash.x, h.y - cash.y) < 20) {
-    const take = Math.min(G.cash, Math.max(1, G.cash * H.robotCarry));
-    G.cash -= take;
-    h.load = take;
-    coinFly(cash.x, cash.y - 8, h.x, h.y - 14, 'bill');
+  // ---- 駐守：走到收銀台旁邊待著 ----
+  const atPost = Math.hypot(h.x - (cash.x + 20), h.y - (cash.y + 12)) < 6;
+  if (!atPost) { moveTo(h, cash.x + 20, cash.y + 12, H.robotSpd, dt); return; }
+  h.vx = h.vy = 0;
+
+  //  檯面上沒錢了：原則上等到裝滿才走，但不能無限等 ——
+  //  收入停下來時，抱著半趟的錢站到天荒地老比較糟。等一下下就先送回去。
+  if (G.cash <= 0) {
+    if (h.load > 0) {
+      h.waitT = (h.waitT || 0) + dt;
+      if (h.waitT >= H.robotPatience) { h.waitT = 0; h.mode = 'deliver'; }
+    }
+    return;
   }
+  h.waitT = 0;
+
+  // 這一趟的目標量：至少 robotMin，或當下現金的六成，但不超過檯面上有的
+  if (h.goal <= 0) {
+    h.goal = Math.min(G.cash, Math.max(H.robotMin, G.cash * H.robotShare));
+  }
+
+  const take = Math.min(G.cash, h.goal - h.load, H.robotDrain * dt);
+  if (take > 0) {
+    G.cash -= take;
+    h.load += take;
+    h.coinT = (h.coinT || 0) - dt;
+    if (h.coinT <= 0) {
+      h.coinT = 0.12;
+      coinFly(cash.x + (rng() - 0.5) * 12, cash.y - 8, h.x, h.y - 14, 'bill');
+    }
+  }
+  if (h.load >= h.goal - 0.001) h.mode = 'deliver';
 }
 
 const HAULER_RANGE = CFG.HELPER.haulRange;

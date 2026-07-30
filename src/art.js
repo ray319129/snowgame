@@ -1121,6 +1121,100 @@ A.decIceArch = px(20, [
   'KKKKK......KKKKK',
 ]);
 
+// ---------- 大型裝飾（用形狀組合，剪影才鎮得住場面）----------
+//  極地風：石陣、鯨骨、獵人石堆
+A.decStoneRing = shape(34, 22, ({ ell, rect }) => {
+  for (let i = 0; i < 5; i++) {
+    const x = 4 + i * 6.5, h = i === 2 ? 16 : 11 + (i % 2) * 3;
+    rect(Math.round(x), 22 - h, 4, h, 'z');
+    rect(Math.round(x) + 3, 22 - h, 1, h, 'Z');
+    rect(Math.round(x), 22 - h, 4, 2, 'h');
+  }
+  ell(17, 20, 15, 3, 'f');
+});
+A.decWhaleBone = shape(38, 26, ({ ell, rect }) => {
+  ell(19, 24, 17, 3, 'f');
+  for (let i = 0; i < 2; i++) {
+    const s = i ? 1 : -1;
+    for (let k = 0; k < 6; k++) {
+      const t = k / 5;
+      rect(Math.round(19 + s * (3 + t * 15)), Math.round(22 - Math.sin(t * 2.1) * 17), 3,
+           Math.round(4 + Math.sin(t * 2.1) * 15), 'x');
+    }
+  }
+  rect(17, 6, 5, 18, 'x');
+});
+A.decCairn = shape(20, 26, ({ ell, rect }) => {
+  ell(10, 24, 9, 3, 'f');
+  const w = [13, 11, 9, 7, 5];
+  let y = 24;
+  for (let i = 0; i < w.length; i++) {
+    y -= 4;
+    rect(Math.round(10 - w[i] / 2), y, w[i], 4, i % 2 ? 'z' : 'h');
+    rect(Math.round(10 - w[i] / 2), y, w[i], 1, 'h');
+    rect(Math.round(10 + w[i] / 2) - 1, y, 1, 4, 'Z');
+  }
+});
+//  節慶風：拱形彩旗、篝火台、禮物堆
+A.decBunting = shape(44, 20, ({ rect, put }) => {
+  rect(1, 3, 3, 17, 'w'); rect(3, 3, 1, 17, 'W');
+  rect(40, 3, 3, 17, 'w'); rect(42, 3, 1, 17, 'W');
+  const cols = ['m', 't', 'G', 'c', 'm', 't', 'G'];
+  for (let i = 0; i < 7; i++) {
+    const x = 6 + i * 5;
+    const y = 4 + Math.round(Math.sin((i / 6) * Math.PI) * 4);
+    for (let k = 0; k < 4; k++) rect(x + k, y + k, 5 - k * 2 + 1, 1, cols[i]);
+  }
+});
+A.decBrazier = shape(22, 28, ({ ell, rect }) => {
+  ell(11, 26, 9, 3, 'f');
+  rect(9, 16, 4, 10, 'i'); rect(12, 16, 1, 10, 'I');
+  rect(4, 22, 14, 2, 'i');
+  ell(11, 14, 9, 4, 'i');
+  ell(11, 13, 7, 3, 'r');
+  ell(11, 11, 5, 4, 'o');
+  ell(11, 9, 3, 3, 'y');
+});
+A.decGifts = shape(26, 20, ({ rect }) => {
+  const box = (x, y, w, h, c, rib) => {
+    rect(x, y, w, h, c);
+    rect(x + Math.floor(w / 2) - 1, y, 2, h, rib);
+    rect(x, y + Math.floor(h / 2) - 1, w, 2, rib);
+  };
+  box(1, 8, 11, 11, 'm', 'G');
+  box(13, 11, 9, 8, 't', 'G');
+  box(6, 1, 8, 7, 'c', 'G');
+});
+//  奇幻風：極光尖塔、浮空符石、星輝噴泉
+A.decSpire = shape(24, 40, ({ ell, rect }) => {
+  ell(12, 38, 10, 3, 'f');
+  rect(8, 26, 8, 12, 'Z'); rect(8, 26, 8, 2, 'z');
+  for (let i = 0; i < 7; i++) {
+    const w = 10 - i, y = 26 - i * 4;
+    rect(Math.round(12 - w / 2), y - 4, w, 5, i > 3 ? 'c' : 'C');
+  }
+  rect(11, 0, 2, 5, 'y');
+});
+A.decRuneStone = shape(24, 30, ({ ell, rect }) => {
+  ell(12, 28, 10, 3, 'f');
+  rect(6, 12, 12, 16, 'Z'); rect(6, 12, 12, 2, 'z');
+  rect(9, 16, 2, 3, 'c'); rect(13, 16, 2, 3, 'c');
+  rect(9, 21, 6, 2, 'c');
+  ell(12, 6, 5, 5, 'C'); ell(12, 6, 3, 3, 'c'); ell(12, 6, 1, 1, 'y');
+});
+A.decFountain = shape(30, 26, ({ ell, rect }) => {
+  ell(15, 24, 14, 4, 'h');
+  ell(15, 23, 11, 3, 'C');
+  ell(15, 22, 8, 2, 'c');
+  rect(13, 10, 4, 12, 'h');
+  ell(15, 9, 7, 3, 'z');
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 4) * Math.PI;
+    rect(Math.round(15 + Math.cos(a) * 7), Math.round(9 - Math.sin(a) * 7), 2, 3, 'c');
+  }
+  ell(15, 2, 2, 2, 'y');
+});
+
 // ---------- 角色頭飾（疊在頭上）----------
 A.hatBeanie = px(14, [
   '....KKKKKK....',
@@ -1175,6 +1269,11 @@ export const DECOR_SPRITE = {
   lantern: () => A.decLantern, banner: () => A.decBanner,
   crystal: () => A.decCrystal, starStone: () => A.decStarStone,
   flowerBed: () => A.decFlowerBed, iceArch: () => A.decIceArch,
+  stoneRing: () => A.decStoneRing, whaleBone: () => A.decWhaleBone,
+  cairn: () => A.decCairn, bunting: () => A.decBunting,
+  brazier: () => A.decBrazier, gifts: () => A.decGifts,
+  spire: () => A.decSpire, runeStone: () => A.decRuneStone,
+  fountain: () => A.decFountain,
 };
 export const HAT_SPRITE = {
   beanie: () => A.hatBeanie, crown: () => A.hatCrown,

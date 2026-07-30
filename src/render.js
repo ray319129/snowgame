@@ -10,7 +10,7 @@ import { px, flipX, tint, drawText, drawTextC, textWidth, abbr } from './pixel.j
 import { world, PROP_SPRITE, inCamp, campRect, makeRng } from './world.js';
 import {
   G, val, nextCost, nextBuildCost, nextBuildWood, nextWeapon, pendingMarks, countWood,
-  orbitRadius,
+  orbitRadius, orbitCount,
 } from './game.js';
 import { input } from './input.js';
 
@@ -750,6 +750,7 @@ function drawPlayer(p) {
   const frames = WEAPON_SPRITE[w.sprite];
   const wf = frames[frames.length > 1 ? Math.floor(G.time * 12) % frames.length : 0];
   const R = orbitRadius();
+  const nb = orbitCount();
 
   // 軌跡環
   ctx.save();
@@ -761,7 +762,7 @@ function drawPlayer(p) {
   ctx.restore();
 
   const blade = (i, front) => {
-    const a = p.orbit + (i / CFG.ORBIT.count) * Math.PI * 2;
+    const a = p.orbit + (i / nb) * Math.PI * 2;
     const sa = Math.sin(a);
     if ((sa >= 0) !== front) return;
     const bx = p.x + Math.cos(a) * R;
@@ -778,14 +779,14 @@ function drawPlayer(p) {
     ctx.restore();
     spr(wf, bx, by + wf.height / 2, alpha * cool);
   };
-  for (let i = 0; i < CFG.ORBIT.count; i++) blade(i, false);   // 身後
+  for (let i = 0; i < nb; i++) blade(i, false);   // 身後
   spr(s, p.x, py, alpha);                                       // 角色蓋在中間
   //  頭飾疊在頭頂（角色高 21px，帽子壓在最上緣）
   if (G.equip.hat && HAT_SPRITE[G.equip.hat]) {
     const hat = HAT_SPRITE[G.equip.hat]();
     spr(p.face < 0 ? L(hat) : hat, p.x, py - 17, alpha);
   }
-  for (let i = 0; i < CFG.ORBIT.count; i++) blade(i, true);     // 身前
+  for (let i = 0; i < nb; i++) blade(i, true);     // 身前
 
   // ---- 背上的肉堆（財富可視化）----
   //  堆得越高越爽。跑動時整座塔會左右擺動，越上面晃越大。

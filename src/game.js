@@ -250,7 +250,7 @@ export function initGame() {
     atkTimer: 0, swing: 0, swingDir: 0,
     //  三把環繞武器，各自有獨立冷卻
     orbit: 0,
-    blades: Array.from({ length: CFG.ORBIT.count }, () => ({ cd: 0 })),
+    blades: Array.from({ length: CFG.ORBIT.base + 4 }, () => ({ cd: 0 })),
     iframes: sp ? 2 : 0, walkT: 0, hurtFlash: 0,
     combatT: 0, nearFire: false, coldTick: 0,
     alive: true, deadT: 0,
@@ -575,10 +575,14 @@ function updateVitals(dt, p) {
 //  好處是玩家只要移動就好（符合本作的單一輸入），而且看起來一直在輸出。
 //  每把刀有自己的冷卻，所以繞一圈掃過一群熊會逐一計傷，不會一幀打爆全部。
 export function orbitRadius() { return CFG.ORBIT.radius + val.weapon().range * 0.35; }
+/** 幾把武器在轉：基礎三把，每升一階武器型態多一把 */
+export function orbitCount() { return CFG.ORBIT.base + G.weapon; }
 
 function updateCombat(dt, p) {
   const w = val.weapon();
   const O = CFG.ORBIT;
+  const n = orbitCount();
+  while (p.blades.length < n) p.blades.push({ cd: 0 });   // 換武器後補足刀數
   p.orbit = (p.orbit + O.speed * dt) % (Math.PI * 2);
 
   const R = orbitRadius();
@@ -586,11 +590,11 @@ function updateCombat(dt, p) {
   const cd = w.interval * 0.85;
   let anyHit = false, treeHit = false;
 
-  for (let i = 0; i < O.count; i++) {
+  for (let i = 0; i < n; i++) {
     const blade = p.blades[i];
     if (blade.cd > 0) { blade.cd -= dt; continue; }
 
-    const a = p.orbit + (i / O.count) * Math.PI * 2;
+    const a = p.orbit + (i / n) * Math.PI * 2;
     const bx = p.x + Math.cos(a) * R;
     const by = p.y - 8 + Math.sin(a) * R * 0.62;   // 稍微壓扁，貼合俯視角
 

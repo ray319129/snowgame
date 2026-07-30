@@ -220,7 +220,8 @@ export const CFG = {
     hauler:  { name: '搬運工',   desc: '自動把地上的肉送回', base: 700,  g: 1.20, max: 25, start: 0,  per: 1,  wood: 4  },
     chopper: { name: '伐木工',   desc: '自動砍樹並送回木材', base: 900,  g: 1.20, max: 25, start: 0,  per: 1,  wood: 4  },
     hunter:  { name: '獵人助手', desc: '自動獵殺野外的熊',   base: 1800, g: 1.22, max: 25, start: 0,  per: 1,  wood: 0  },
-    robot:   { name: '收銀機器人', desc: '自動把收銀台的錢收走', base: 2600, g: 1.23, max: 25, start: 0, per: 1, wood: 6 },
+    //  機器人是買斷制：一台就夠，之後永久駐守收銀台
+    robot:   { name: '收銀機器人', desc: '駐守收銀台，收滿一趟就入帳', base: 4500, g: 1, max: 1, start: 0, per: 1, wood: 8 },
   },
 
   //  木材庫存上限。滿了之後多的木頭會自動換成錢，不會浪費。
@@ -268,12 +269,18 @@ export const CFG = {
     hunterPower: 0.42,
     chopperPower: 0.55,
     robotSpd: 105,
-    robotCarry: 0.22,       // 機器人一趟搬走收銀台的幾成現金
+    //  機器人駐守收銀台，把錢裝滿一趟才回去入帳。
+    //  目標量在每趟開始時鎖定，且不超過當下檯面上的現金 —— 才不會裝不滿卡死。
+    robotDrain: 900,        // 每秒吸走多少現金
+    robotMin: 2000,         // 一趟至少裝這麼多
+    robotShare: 0.6,        // 或是當下現金的六成，取大者
+    robotPatience: 6,       // 檯面空了、又還沒裝滿時，等幾秒就先送回去
   },
 
   // ---- 環繞武器 ----
-  //  武器分成三把繞著角色轉，每把獨立判定傷害。
-  ORBIT: { count: 3, radius: 26, speed: 2.6, hitCd: 0.42 },
+  //  基礎三把，每升一階武器型態就多一把繞著轉（3 → 7）。
+  //  每把獨立判定傷害與冷卻，所以換武器是看得見的形態進化。
+  ORBIT: { base: 3, radius: 26, speed: 2.6, hitCd: 0.42 },
 
   SELL_INTERVAL: 0.055,     // 玩家把肉放上貨架的速度
   CASH_PICK: 0.014,         // 撿現金的速度（越小越快）
@@ -283,15 +290,28 @@ export const CFG = {
   // ---- 商店：純外觀，不影響數值。錢在後期會過剩，這是它的去處 ----
   //  style 只用來在商店裡分組，讓玩家挑得到自己喜歡的調性。
   SHOP: {
+    //  位置沿著營地一圈散開，買越多整個據點越滿。大型件放在外圈當地標。
     decor: [
-      { id: 'snowman',   name: '雪人',     cost: 1500,   style: '極地', x: 268, y: 1236 },
-      { id: 'totem',     name: '圖騰柱',   cost: 6000,   style: '極地', x: 496, y: 1236 },
-      { id: 'flowerBed', name: '冰原花圃', cost: 24000,  style: '極地', x: 268, y: 1480 },
-      { id: 'lantern',   name: '暖光燈籠', cost: 9000,   style: '節慶', x: 336, y: 1244 },
-      { id: 'banner',    name: '獵團旗幟', cost: 38000,  style: '節慶', x: 436, y: 1236 },
-      { id: 'crystal',   name: '極光水晶', cost: 120000, style: '奇幻', x: 496, y: 1480 },
-      { id: 'starStone', name: '星屑石',   cost: 320000, style: '奇幻', x: 380, y: 1214 },
-      { id: 'iceArch',   name: '冰晶拱門', cost: 900000, style: '奇幻', x: 380, y: 1496 },
+      // 極地
+      { id: 'snowman',   name: '雪人',       cost: 1500,    style: '極地', x: 264, y: 1232 },
+      { id: 'cairn',     name: '獵人石堆',   cost: 7000,    style: '極地', x: 500, y: 1232 },
+      { id: 'totem',     name: '圖騰柱',     cost: 22000,   style: '極地', x: 246, y: 1352 },
+      { id: 'flowerBed', name: '冰原花圃',   cost: 60000,   style: '極地', x: 264, y: 1478 },
+      { id: 'stoneRing', name: '遠古石陣',   cost: 180000,  style: '極地', x: 196, y: 1268 },
+      { id: 'whaleBone', name: '鯨骨遺骸',   cost: 520000,  style: '極地', x: 176, y: 1436 },
+      // 節慶
+      { id: 'lantern',   name: '暖光燈籠',   cost: 9000,    style: '節慶', x: 330, y: 1240 },
+      { id: 'gifts',     name: '禮物堆',     cost: 34000,   style: '節慶', x: 512, y: 1352 },
+      { id: 'banner',    name: '獵團旗幟',   cost: 95000,   style: '節慶', x: 430, y: 1232 },
+      { id: 'brazier',   name: '節慶火盆',   cost: 260000,  style: '節慶', x: 500, y: 1478 },
+      { id: 'bunting',   name: '慶典彩旗',   cost: 780000,  style: '節慶', x: 380, y: 1196 },
+      // 奇幻
+      { id: 'crystal',   name: '極光水晶',   cost: 140000,  style: '奇幻', x: 300, y: 1502 },
+      { id: 'runeStone', name: '浮空符石',   cost: 420000,  style: '奇幻', x: 584, y: 1268 },
+      { id: 'starStone', name: '星屑石',     cost: 1200000, style: '奇幻', x: 462, y: 1502 },
+      { id: 'fountain',  name: '星輝噴泉',   cost: 3600000, style: '奇幻', x: 604, y: 1436 },
+      { id: 'spire',     name: '極光尖塔',   cost: 9000000, style: '奇幻', x: 380, y: 1534 },
+      { id: 'iceArch',   name: '冰晶拱門',   cost: 25000000, style: '奇幻', x: 176, y: 1352 },
     ],
     hat: [
       { id: 'beanie',   name: '毛線帽',   cost: 800,    style: '極地' },
