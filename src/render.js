@@ -431,7 +431,10 @@ function drawCash(cz) {
 function drawDecor(d) {
   const s = DECOR_SPRITE[d.id]();
   shadow(d.x, d.y - 1, s.width * 0.34, 3.5, 0.24);
-  const bob = d.style === '奇幻' ? Math.round(Math.sin(G.time * 1.6 + d.x) * 1) : 0;
+  //  奇幻件浮空、可愛件輕輕晃 —— 兩種都比站著不動討喜
+  const bob = d.style === '奇幻' ? Math.round(Math.sin(G.time * 1.6 + d.x) * 1)
+            : d.style === '可愛' ? Math.round(Math.sin(G.time * 2.4 + d.x) * 0.6)
+            : 0;
   spr(s, d.x, d.y + bob);
   if (d.style === '奇幻' || d.id === 'lantern') {
     const fl = 0.75 + Math.sin(G.time * 3 + d.x) * 0.25;

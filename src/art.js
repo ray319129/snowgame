@@ -1215,6 +1215,212 @@ A.decFountain = shape(30, 26, ({ ell, rect }) => {
   ell(15, 2, 2, 2, 'y');
 });
 
+// ---------- 可愛系裝飾：圓潤剪影 + 大眼睛 + 柔色 ----------
+A.decPenguin = px(14, [
+  '.....KKKK.....',
+  '....KLLLLK....',
+  '...KLLLLLLK...',
+  '..KLKffffKLK..',
+  '..KLfeffefLK..',   // 大眼
+  '..KLffooffLK..',   // 橘喙
+  '.KLLffffffLLK.',
+  'KLLLffffffLLLK',
+  'KLLLffffffLLLK',
+  'KLLLffffffLLLK',
+  '.KLLffffffLLK.',
+  '..KLLffffLLK..',
+  '...KKoKKoKK...',
+  '....KKK.KKK...',
+]);
+A.decBunny = px(14, [
+  '...K......K...',
+  '..KfK....KfK..',
+  '..KfaK..KafK..',
+  '..KfaK..KafK..',
+  '..KffK..KffK..',
+  '...KffKKffK...',
+  '...KffffffK...',
+  '..KffefeffK...',   // 眼
+  '..KfffAffffK..',   // 粉鼻
+  '.KffffffffffK.',
+  'KffffffffffffK',
+  'KffffffffffffK',
+  '.KffffffffffK.',
+  '..KKKKKKKKKK..',
+]);
+A.decFox = px(16, [
+  '..K..........K..',
+  '.KfK........KfK.',
+  '.KfEK......KEfK.',
+  '.KffK......KffK.',
+  '..KffKKKKKKffK..',
+  '..KfffffffffK...',
+  '.KffefffffefK...',
+  '.KfffffKffffK...',
+  'KffffffffffffK..',
+  'KffffffffffffKK.',
+  'KfffffffffffffK.',
+  '.KffffffffffEfK.',   // 尾巴
+  '.KffffffffEEEfK.',
+  '..KffffffKKEEK..',
+  '..KKKKKKK..KKK..',
+  '................',
+]);
+A.decBearPlush = px(14, [
+  '.KK......KK...',
+  'KbbK....KbbK..',
+  'KbBK....KbBK..',
+  '.KbbKKKKbbK...',
+  '..KbbbbbbbK...',
+  '.KbbebbebbK...',   // 縫線眼
+  '.KbbbjjbbbK...',   // 淺色吻部
+  '.KbbbKKbbbK...',
+  '..KbbbbbbK....',
+  '.KbbbbbbbbK...',
+  'KbbjjbbjjbbK..',
+  'KbbbbbbbbbbK..',
+  '.KbbK..KbbK...',
+  '.KKK....KKK...',
+]);
+A.decSnowballs = px(16, [
+  '................',
+  '.....KKKK.......',
+  '....KffffK......',
+  '....KffffK......',
+  '.....KKKK.......',
+  '..KKKK..KKKK....',
+  '.KffffKKffffK...',
+  'KffffffffffffK..',
+  'KffffffffffffK..',
+  '.KffffKKffffK...',
+  '..KKKK..KKKK....',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+]);
+A.decMushrooms = px(16, [
+  '................',
+  '....KKKK........',
+  '..KKmmmmKK......',
+  '.KmfmmmfmK..KK..',
+  'KmmmfmmmmmKKmmK.',
+  'KmmmmmmmmmKmfmK.',
+  '.KKKffKKKKKmmmK.',
+  '...KffK..KKKKKK.',
+  '...KffK....KffK.',
+  '..KKffKK..KKffK.',
+  '..KffffK..KffffK',
+  '..KKKKKK..KKKKKK',
+  '................',
+  '................',
+  '................',
+  '................',
+]);
+A.decGingerbread = px(22, [
+  '.........KK...........',
+  '........KwwK..........',
+  '.......KwffwK.........',
+  '......KwffffwK........',
+  '.....KwffwwffwK.......',
+  '....KwffwwwwffwK......',
+  '...KwffwwwwwwffwK.....',
+  '..KffffffffffffffK....',
+  '.KwwwwwwwwwwwwwwwwK...',
+  'KwwaKKKKwwwwKKKKawwK..',
+  'KwwKffffKwwKffffKwwK..',
+  'KwwKffffKwwKffffKwwK..',
+  'KwwKKKKKKwwKKKKKKwwK..',
+  'KwwwwwwwKWWKwwwwwwwK..',
+  'KwwwwwwwKWWKwwwwwwwK..',
+  'KKKKKKKKKKKKKKKKKKKK..',
+  '......................',
+  '......................',
+  '......................',
+  '......................',
+  '......................',
+  '......................',
+]);
+A.decCocoa = px(20, [
+  '.......ff...........',
+  '......f.f...........',
+  '.......ff...........',
+  '....KKKKKKKK........',
+  '...KfffffffbK.......',
+  '...KfbbbbbbfK.......',
+  '...KfbbbbbbfKK......',
+  '...KfbbbbbbfKaK.....',
+  '...KKffffffKKKK.....',
+  '.....KKKKKK.........',
+  '..KKKKKKKKKKKKK.....',
+  '.KaAaAaAaAaAaAK.....',
+  'KwwwwwwwwwwwwwwK....',
+  'KWWWWWWWWWWWWWWK....',
+  'KKKKKKKKKKKKKKKK....',
+  '.KwWK......KwWK.....',
+  '.KwWK......KwWK.....',
+  '.KKKK......KKKK.....',
+  '....................',
+  '....................',
+]);
+A.decPinwheel = px(16, [
+  '.....KKK........',
+  '..KKKaaaKKK.....',
+  '.KaaaKaaKlllK...',
+  '.KaaaaKKllllK...',
+  '..KaaaKKlllK....',
+  '...KKVVVVKK.....',
+  '...KVVyyVVK.....',
+  '...KKVVVVKK.....',
+  '..KlllKKaaaK....',
+  '.KllllKKaaaaK...',
+  '.KlllKaaKaaaK...',
+  '..KKKlaaaKKK....',
+  '......KwK.......',
+  '......KWK.......',
+  '......KwK.......',
+  '.....KKKK.......',
+]);
+A.decSprite = px(14, [
+  '....K....K....',
+  '...KlK..KlK...',
+  '..KlllKKlllK..',
+  '.KlllllllllK..',
+  'KlllllllllllK.',
+  'KllellllelllK.',   // 兩顆分開的大眼
+  'KllellllelllK.',
+  'KlllllllllllK.',
+  'KlaKlllllKalK.',   // 粉臉頰
+  'KlllKlllKlllK.',   // 小嘴
+  '.KlllKKKlllK..',
+  '..KlllllllK...',
+  '...KKKKKKK....',
+  '..............',
+]);
+A.decDuckPond = px(20, [
+  '....................',
+  '.......KKK..........',
+  '......KyyyK.........',   // 鴨頭
+  '.....KyeyyyK........',   // 眼
+  '.....KyyyyyKoK......',   // 橘喙
+  '...KKKyyyyyKKK......',
+  '..KcKyyyyyyyyKcK....',
+  '.KcCKyyyyyyyyyKCcK..',   // 身體浮在水面上
+  '.KcCKyyyyyyyyKCCcK..',
+  '.KcCCKKyyyyKKCCCcK..',
+  '..KcCCCCCCCCCCCcK...',
+  '...KcCCCCCCCCCcK....',
+  '....KKcccccccKK.....',
+  '......KKKKKKK.......',
+  '....................',
+  '....................',
+  '....................',
+  '....................',
+  '....................',
+  '....................',
+]);
+
 // ---------- 角色頭飾（疊在頭上）----------
 A.hatBeanie = px(14, [
   '....KKKKKK....',
@@ -1274,6 +1480,11 @@ export const DECOR_SPRITE = {
   brazier: () => A.decBrazier, gifts: () => A.decGifts,
   spire: () => A.decSpire, runeStone: () => A.decRuneStone,
   fountain: () => A.decFountain,
+  penguin: () => A.decPenguin, bunny: () => A.decBunny, fox: () => A.decFox,
+  bearPlush: () => A.decBearPlush, snowballs: () => A.decSnowballs,
+  mushrooms: () => A.decMushrooms, gingerbread: () => A.decGingerbread,
+  cocoa: () => A.decCocoa, pinwheel: () => A.decPinwheel,
+  sprite: () => A.decSprite, duckPond: () => A.decDuckPond,
 };
 export const HAT_SPRITE = {
   beanie: () => A.hatBeanie, crown: () => A.hatCrown,
