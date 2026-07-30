@@ -13,7 +13,8 @@ import { initBase, updateBase, resetBase, shelfSpace, depositMeat } from './base
 export const rng = makeRng(4242);
 
 const EMPTY_UPG   = () => ({ cap: 0, speed: 0, power: 0, vigor: 0, warm: 0 });
-const EMPTY_BUILD = () => ({ shelf: 0, counter: 0, wall: 0, tower: 0, hauler: 0, hunter: 0 });
+const EMPTY_BUILD = () =>
+  ({ shelf: 0, counter: 0, wall: 0, tower: 0, hauler: 0, chopper: 0, hunter: 0, robot: 0 });
 const EMPTY_TREE  = () => ({ blood: 0, skill: 0, swift: 0, hide: 0, harvest: 0, fame: 0, spark: 0 });
 
 export const G = {
@@ -68,6 +69,10 @@ export const G = {
   towerPlace: 0,
   towerLock: false,            // 剛放下：要離開範圍才能再扛
 
+  //  商店：擁有的裝飾品與目前穿戴（純外觀，不影響數值）
+  owned: { decor: [], hat: [], crew: ['none'] },
+  equip: { hat: null, crew: 'none' },
+
   //  開發者工具（? dev=1 或按 ` 開啟）
   devThreat: null,             // 覆寫威脅等級
   devGod: false,
@@ -102,6 +107,7 @@ export function save() {
       baseHp: G.baseHp,
       wood: G.wood,
       towerPos: G.towerPos,
+      owned: G.owned, equip: G.equip,
       // 玩家身上的東西也要存，不然重整就掉背包
       player: p ? { x: p.x, y: p.y, hp: p.hp, carry: p.carry } : null,
       fire: world.firepits.map(f => f.lit),
@@ -122,7 +128,11 @@ function load() {
     const raw = localStorage.getItem(CFG.SAVE_KEY);
     if (!raw) return;
     const d = JSON.parse(raw);
-    if (!d || d.v !== CFG.SAVE_VERSION) return;   // 版本不符就重來
+    if (!d) return;
+    //  存檔相容策略：新版本只「補欄位」，不整包丟掉。
+    //  舊檔缺的鍵一律靠 EMPTY_* 與 || 預設值補齊，玩家的進度不會因為更新而消失。
+    //  只有真的舊到無法解讀（v 比最低相容版本還小）才放棄。
+    if (d.v > CFG.SAVE_VERSION || d.v < CFG.SAVE_MIN) return;
     G.money = d.money || 0;
     G.lifetime = d.lifetime || 0;
     G.runEarned = d.runEarned || 0;
@@ -140,6 +150,12 @@ function load() {
     G.baseHp = d.baseHp || CFG.BASE.hp;
     G.wood = d.wood || 0;
     G.towerPos = Array.isArray(d.towerPos) ? d.towerPos : null;
+    if (d.owned) {
+      G.owned.decor = d.owned.decor || [];
+      G.owned.hat   = d.owned.hat || [];
+      G.owned.crew  = d.owned.crew || ['none'];
+    }
+    if (d.equip) Object.assign(G.equip, d.equip);
     G.savedPlayer = d.player || null;
     if (d.fire) d.fire.forEach((lit, i) => { if (world.firepits[i]) world.firepits[i].lit = lit; });
   } catch (e) { /* 壞檔就當新玩家 */ }
@@ -232,6 +248,9 @@ export function initGame() {
     hp: sp ? Math.max(val.hpMax() * 0.5, sp.hp || 0) : val.hpMax(),
     carry: sp ? (sp.carry || []) : [],
     atkTimer: 0, swing: 0, swingDir: 0,
+    //  三把環繞武器，各自有獨立冷卻
+    orbit: 0,
+    blades: Array.from({ length: CFG.ORBIT.count }, () => ({ cd: 0 })),
     iframes: sp ? 2 : 0, walkT: 0, hurtFlash: 0,
     combatT: 0, nearFire: false, coldTick: 0,
     alive: true, deadT: 0,
@@ -551,92 +570,87 @@ function updateVitals(dt, p) {
   if (p.hp <= 0) die();
 }
 
-// ---------------- 戰鬥 ----------------
+// ---------------- 戰鬥：三把環繞武器 ----------------
+//  武器不再是「面向敵人揮一下」，而是三把繞著角色轉、各自獨立判定。
+//  好處是玩家只要移動就好（符合本作的單一輸入），而且看起來一直在輸出。
+//  每把刀有自己的冷卻，所以繞一圈掃過一群熊會逐一計傷，不會一幀打爆全部。
+export function orbitRadius() { return CFG.ORBIT.radius + val.weapon().range * 0.35; }
+
 function updateCombat(dt, p) {
   const w = val.weapon();
-  p.atkTimer -= dt;
-  if (p.swing > 0) p.swing -= dt;
+  const O = CFG.ORBIT;
+  p.orbit = (p.orbit + O.speed * dt) % (Math.PI * 2);
 
-  let best = null, bd = w.range + 6;
-  for (const b of G.bears) {
-    const d = Math.hypot(b.x - p.x, b.y - p.y);
-    if (d < bd) { bd = d; best = b; }
-  }
-  if (!best) { chopTree(p, w); return; }
-  if (p.atkTimer > 0) return;
-
-  p.atkTimer = w.interval;
-  p.swing = Math.min(0.24, w.interval * 0.5);
-  p.swingMax = p.swing;
-  p.swingDir = Math.atan2(best.y - p.y, best.x - p.x);
-  p.face = Math.cos(p.swingDir) >= 0 ? 1 : -1;
-  SFX.swing();
-
+  const R = orbitRadius();
   const dmg = val.power();
-  let hit = 0;
-  for (const b of G.bears.slice()) {
-    if (hit >= w.targets) break;
-    const dx = b.x - p.x, dy = b.y - p.y;
-    const d = Math.hypot(dx, dy);
-    if (d > w.range + b.radius) continue;
-    let da = Math.atan2(dy, dx) - p.swingDir;
-    while (da > Math.PI) da -= Math.PI * 2;
-    while (da < -Math.PI) da += Math.PI * 2;
-    if (Math.abs(da) > w.arc / 2) continue;
+  const cd = w.interval * 0.85;
+  let anyHit = false, treeHit = false;
 
-    b.hp -= dmg;
-    b.flash = 0.12;
-    b.knockX += (dx / (d || 1)) * 70;
-    b.knockY += (dy / (d || 1)) * 70;
-    float(b.x, b.y - 18, '-' + abbr(Math.round(dmg)), '#ffd651');
-    // 命中點大約在熊身體靠玩家的那一側
-    hitFx(w.hit, b.x - (dx / (d || 1)) * 4, b.y - 8, p.swingDir, w.color);
-    hit++;
-    if (b.hp <= 0) killBear(b);
+  for (let i = 0; i < O.count; i++) {
+    const blade = p.blades[i];
+    if (blade.cd > 0) { blade.cd -= dt; continue; }
+
+    const a = p.orbit + (i / O.count) * Math.PI * 2;
+    const bx = p.x + Math.cos(a) * R;
+    const by = p.y - 8 + Math.sin(a) * R * 0.62;   // 稍微壓扁，貼合俯視角
+
+    // ---- 打熊 ----
+    let hitSomething = false;
+    for (const b of G.bears.slice()) {
+      if (Math.hypot(b.x - bx, b.y - 8 - by) > b.radius + 7) continue;
+      b.hp -= dmg;
+      b.flash = 0.12;
+      const dx = b.x - p.x, dy = b.y - p.y, d = Math.hypot(dx, dy) || 1;
+      b.knockX += (dx / d) * 60;
+      b.knockY += (dy / d) * 60;
+      float(b.x, b.y - 18, '-' + abbr(Math.round(dmg)), '#ffd651');
+      hitFx(w.hit, bx, by, a, w.color);
+      if (b.hp <= 0) killBear(b);
+      hitSomething = true;
+      anyHit = true;
+      break;                                        // 一把刀一次只打一隻
+    }
+
+    // ---- 沒打到熊就順手砍樹 ----
+    if (!hitSomething) {
+      for (const pr of world.props) {
+        if (pr.kind !== 'tree' || pr.deadT > 0 || pr.hp <= 0) continue;
+        if (Math.hypot(pr.x - bx, pr.y - 6 - by) > 10) continue;
+        damageTree(pr, dmg * 0.6);
+        hitSomething = true;
+        treeHit = true;
+        break;
+      }
+    }
+
+    if (hitSomething) blade.cd = cd;
   }
-  if (hit) { SFX.hit(w.hit); G.shake = Math.max(G.shake, w.shake); }
+
+  if (anyHit) { SFX.hit(w.hit); G.shake = Math.max(G.shake, w.shake * 0.6); }
+  else if (treeHit) { SFX.hit('crush'); G.shake = Math.max(G.shake, 0.8); }
 }
 
-// ---------------- 砍樹 ----------------
-function chopTree(p, w) {
-  if (p.atkTimer > 0) return;
-  let best = null, bd = w.range * 0.95;
-  for (const pr of world.props) {
-    if (pr.kind !== 'tree' || pr.deadT > 0 || pr.hp <= 0) continue;
-    const d = Math.hypot(pr.x - p.x, pr.y - p.y);
-    if (d < bd) { bd = d; best = pr; }
+// ---------------- 砍樹（玩家與伐木工共用）----------------
+export function damageTree(pr, amount) {
+  pr.hp -= amount;
+  burst(pr.x, pr.y - 12, 3, '#8d6539', 42);
+  if (pr.hp > 0) return false;
+
+  pr.hp = 0;
+  pr.deadT = CFG.TREE.respawn;
+  const n = CFG.TREE.drops + (rng() < 0.5 ? 1 : 0);
+  for (let i = 0; i < n; i++) {
+    const a = rng() * Math.PI * 2, s = 18 + rng() * 28;
+    G.drops.push({
+      x: pr.x + (rng() - 0.5) * 8, y: pr.y,
+      vx: Math.cos(a) * s, vy: Math.sin(a) * s,
+      z: 4, vz: 20 + rng() * 14,
+      life: CFG.MEAT.despawn, value: WOOD_MARKER, spin: rng() * 4,
+    });
   }
-  if (!best) return;
-
-  p.atkTimer = w.interval;
-  p.swing = Math.min(0.24, w.interval * 0.5);
-  p.swingMax = p.swing;
-  p.swingDir = Math.atan2(best.y - p.y, best.x - p.x);
-  p.face = Math.cos(p.swingDir) >= 0 ? 1 : -1;
-  SFX.swing();
-
-  best.hp -= val.power() * 0.6;
-  burst(best.x, best.y - 12, 4, '#8d6539', 42);
-  G.shake = Math.max(G.shake, 0.8);
-
-  if (best.hp <= 0) {
-    best.hp = 0;
-    best.deadT = CFG.TREE.respawn;
-    const n = CFG.TREE.drops + (rng() < 0.5 ? 1 : 0);
-    for (let i = 0; i < n; i++) {
-      const a = rng() * Math.PI * 2, s = 18 + rng() * 28;
-      G.drops.push({
-        x: best.x + (rng() - 0.5) * 8, y: best.y,
-        vx: Math.cos(a) * s, vy: Math.sin(a) * s,
-        z: 4, vz: 20 + rng() * 14,
-        life: CFG.MEAT.despawn, value: WOOD_MARKER, spin: rng() * 4,
-      });
-    }
-    burst(best.x, best.y - 14, 10, '#8d6539', 62);
-    burst(best.x, best.y - 14, 4, '#a0d060', 40);
-    G.shake = Math.max(G.shake, 2.0);
-    SFX.hit('crush');
-  }
+  burst(pr.x, pr.y - 14, 10, '#8d6539', 62);
+  burst(pr.x, pr.y - 14, 4, '#a0d060', 40);
+  return true;
 }
 
 // ---------------- 樹木再生 ----------------
@@ -1100,7 +1114,7 @@ function updateTriggers(dt, p) {
     G.cashTimer -= dt;
     while (G.cashTimer <= 0 && G.cash > 0) {
       G.cashTimer += CFG.CASH_PICK;
-      const take = Math.max(1, Math.ceil(G.cash / 24));
+      const take = Math.max(1, Math.ceil(G.cash / CFG.CASH_CHUNK));
       const amt = Math.min(G.cash, take);
       G.cash -= amt;
       earn(amt);
@@ -1235,6 +1249,33 @@ export function buyWeapon() {
   SFX.upgradeBig(); G.flash = 0.8; G.shake = 5;
   burst(CFG.WEAPON_RACK.x, CFG.WEAPON_RACK.y - 10, 30, w.color, 90);
   G.onToast(`取得新武器：${w.name}！`);
+  save();
+  return true;
+}
+
+// ---------------- 商店（純外觀）----------------
+//  裝飾品是永久的：轉生不會清掉。錢在後期會嚴重過剩，這是它的去處，
+//  而且「我的據點長得跟別人不一樣」本身就是一種成就展示。
+export function shopBuy(cat, id) {
+  const item = CFG.SHOP[cat].find(i => i.id === id);
+  if (!item || G.owned[cat].includes(id)) return false;
+  if (G.money < item.cost) return false;
+  G.money -= item.cost;
+  G.owned[cat].push(id);
+  if (cat === 'hat') G.equip.hat = id;
+  if (cat === 'crew') G.equip.crew = id;
+  SFX.upgradeBig(); G.flash = 0.6; G.shake = 3;
+  G.onToast(`購入 ${item.name}`);
+  const p = G.player;
+  burst(p.x, p.y - 12, 22, '#ffd651', 80);
+  save();
+  return true;
+}
+
+export function shopEquip(cat, id) {
+  if (!G.owned[cat].includes(id)) return false;
+  G.equip[cat] = G.equip[cat] === id && cat === 'hat' ? null : id;   // 帽子可以脫掉
+  SFX.upgrade();
   save();
   return true;
 }

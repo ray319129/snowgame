@@ -7,8 +7,9 @@ import { initAudio } from './audio.js';
 import {
   G, initGame, update, val, save, resetSave,
   nextCost, nextBuildCost, nextBuildWood, nextWeapon, levelCap, threatLevel,
-  pendingMarks, markSpendable, buyMark, doPrestige,
+  pendingMarks, markSpendable, buyMark, doPrestige, shopBuy, shopEquip,
 } from './game.js';
+import { ART, DECOR_SPRITE, HAT_SPRITE } from './art.js';
 import { initRender, resizeRender, render, SM } from './render.js';
 import { initDev } from './dev.js';
 import { abbr } from './pixel.js';
@@ -47,13 +48,19 @@ let VW = CFG.BASE_W, VH = 512;
 
 // ---------------- 視窗適配 ----------------
 function resize() {
-  const availW = window.innerWidth, availH = window.innerHeight;
+  //  分頁在背景／隱藏狀態載入時，innerWidth/Height 可能是 0，
+  //  算出來的 VH 會變成 NaN，canvas 高度被瀏覽器轉成 0，
+  //  之後每一幀的 cam 都是 NaN，畫布 API 會整幀丟例外。
+  //  這裡強制取一個合理下限，寬高永遠是有限正整數。
+  const availW = Math.max(1, window.innerWidth || 0);
+  const availH = Math.max(1, window.innerHeight || 0);
   VW = CFG.BASE_W;
-  VH = Math.round(Math.max(CFG.MIN_H, Math.min(CFG.MAX_H, VW * availH / availW)));
+  const ratio = VW * availH / availW;
+  VH = Math.round(Math.max(CFG.MIN_H, Math.min(CFG.MAX_H, isFinite(ratio) ? ratio : CFG.MIN_H)));
   canvas.width = VW; canvas.height = VH;
 
-  const scale = Math.min(availW / VW, availH / VH);
-  const cssW = Math.floor(VW * scale), cssH = Math.floor(VH * scale);
+  const scale = Math.max(0.01, Math.min(availW / VW, availH / VH));
+  const cssW = Math.max(1, Math.floor(VW * scale)), cssH = Math.max(1, Math.floor(VH * scale));
   stage.style.width = cssW + 'px';
   stage.style.height = cssH + 'px';
 
@@ -159,6 +166,87 @@ function buildLabel(key, lv) {
   if (key === 'hauler')  return lv === 0 ? '未僱用' : lv + ' 人';
   if (key === 'hunter')  return lv === 0 ? '未僱用' : lv + ' 人';
   return '' + v;
+}
+
+// ---------------- 裝飾商店 ----------------
+//  純外觀消費。錢在後期會嚴重過剩，這裡是它的去處。
+const shopEl = document.getElementById('shop');
+const shopList = document.getElementById('shopList');
+let shopCat = 'decor';
+
+function shopIcon(cat, item) {
+  const c = document.createElement('canvas');
+  const src = cat === 'decor' ? DECOR_SPRITE[item.id]()
+            : cat === 'hat'   ? HAT_SPRITE[item.id]()
+            : ART.hauler;
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext('2d');
+  g.imageSmoothingEnabled = false;
+  g.drawImage(src, 0, 0);
+  if (cat === 'crew' && item.tint) {
+    g.globalCompositeOperation = 'source-atop';
+    g.globalAlpha = 0.42; g.fillStyle = item.tint;
+    g.fillRect(0, 0, c.width, c.height);
+  }
+  return c;
+}
+
+function renderShop() {
+  shopList.innerHTML = '';
+  const items = CFG.SHOP[shopCat];
+  let style = null;
+  for (const item of items) {
+    if (item.style !== style) {
+      style = item.style;
+      const h = document.createElement('div');
+      h.className = 'styleHd';
+      h.textContent = style + ' 風格';
+      shopList.appendChild(h);
+    }
+    const own = G.owned[shopCat].includes(item.id);
+    const on = shopCat !== 'decor' && G.equip[shopCat] === item.id;
+    const afford = G.money >= item.cost;
+
+    const d = document.createElement('div');
+    d.className = 'sItem' + (on ? ' on' : own ? ' own' : afford ? '' : ' no');
+    d.appendChild(shopIcon(shopCat, item));
+    const nm = document.createElement('div');
+    nm.className = 'nm';
+    nm.innerHTML = `${item.name}<em>${on ? '使用中' : own ? '已擁有' : item.style}</em>`;
+    d.appendChild(nm);
+    const pc = document.createElement('div');
+    pc.className = 'pc';
+    pc.textContent = own ? (shopCat === 'decor' ? '已放置' : on ? '★' : '點擊穿戴') : '$' + abbr(item.cost);
+    d.appendChild(pc);
+
+    d.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      if (own) { if (shopCat !== 'decor') shopEquip(shopCat, item.id); }
+      else shopBuy(shopCat, item.id);
+      renderShop();
+    });
+    shopList.appendChild(d);
+  }
+}
+
+function openShop(v) {
+  shopEl.classList.toggle('on', v);
+  setInputEnabled(!v);
+  if (v) renderShop();
+}
+document.getElementById('shopBtn').addEventListener('pointerdown', (e) => {
+  e.stopPropagation(); openShop(true);
+});
+document.getElementById('shopClose').addEventListener('pointerdown', (e) => {
+  e.stopPropagation(); openShop(false);
+});
+for (const t of document.querySelectorAll('#shopTabs span')) {
+  t.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    shopCat = t.dataset.cat;
+    for (const o of document.querySelectorAll('#shopTabs span')) o.classList.toggle('on', o === t);
+    renderShop();
+  });
 }
 
 // ---------------- 印記樹 ----------------

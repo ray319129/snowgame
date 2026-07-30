@@ -738,6 +738,46 @@ A.helperHunter = px(14, [
   '.....K...K....',
 ]);
 
+//  伐木工：綠格子外套 + 肩上的斧頭
+A.chopperMan = px(14, [
+  '....KKKKKK....',
+  '...KffffffK...',
+  '..KfFFFFFFfK..',
+  '..KfsssssSfK..',
+  '..KfsesssSfK..',
+  '...KfFFFFfK...',
+  '...KtuTutTK.K.',
+  '..KtuTutTutKzK',
+  '..KuTutTutuKzK',
+  '..KtubbbuTtKK.',
+  '..KTtuuuuTTK..',
+  '...KTtttTTK...',
+  '....KTK.KTK...',
+  '....KbK.KbK...',
+  '....KBK.KBK...',
+  '.....K...K....',
+]);
+
+//  收銀機器人：方頭 + 天線 + 胸口的金幣槽（刻意做成一眼認得出的機器人剪影）
+A.robotUnit = px(14, [
+  '......K.......',
+  '.....KyK......',
+  '.....KIK......',
+  '..KKKKKKKKK...',
+  '..KIiiiiiiIK..',
+  '..KIcKIIKcIK..',   // 兩顆發光的眼
+  '..KIiiiiiiIK..',
+  '..KKIIIIIIKK..',
+  '.KIiiiiiiiiIK.',
+  '.KIiKGGGGKiIK.',   // 胸口的金幣槽
+  '.KIiKGyyGKiIK.',
+  '.KIiKGGGGKiIK.',
+  '.KIiiiiiiiiIK.',
+  '.KKIIIIIIIIKK.',
+  '..KIK....KIK..',
+  '..KKK....KKK..',
+]);
+
 //  遠征營帳（轉生入口）
 A.prestigeTent = px(22, [
   '..........KK..........',
@@ -917,9 +957,235 @@ A.woodYard = shape(30, 22, ({ rect }) => {
   }
 });
 
+A.icoChopper = px(12, [   // 斧頭
+  '...KKKK.....',
+  '..KzzzzKK...',
+  '.KhzzzzzZK..',
+  'KhzzKKzzZZK.',
+  'KhzK..KZZK..',
+  '.KK.KwK.KK..',
+  '....KwK.....',
+  '....KWK.....',
+  '....KwK.....',
+  '....KWK.....',
+  '....KwK.....',
+  '....KKK.....',
+]);
+A.icoRobot = px(12, [     // 機器人頭
+  '....K..K....',
+  '.....KK.....',
+  '.KKKKKKKKKK.',
+  'KIiiiiiiiiIK',
+  'KIcKIIIIKcIK',
+  'KIiiiiiiiiIK',
+  'KIiKGGGGKiIK',
+  'KIiKGyyGKiIK',
+  'KIiiiiiiiiIK',
+  'KKIIIIIIIIKK',
+  '.KIK....KIK.',
+  '.KKK....KKK.',
+]);
+
+// ============================================================
+//  商店裝飾品
+//  三種風格：極地質樸（雪人／圖騰）、節慶溫暖（燈籠／彩旗）、極光奇幻（水晶／星石）
+// ============================================================
+A.decSnowman = px(16, [
+  '.....KKKK.......',
+  '....KffffK......',
+  '...KfKffKfK.....',
+  '...Kfffffff K...',
+  '...KfrfffffK....',
+  '....KfffffK.....',
+  '...KKKKKKKK.....',
+  '..KfffffffffK...',
+  '.KffffKKffffK...',
+  '.KfffKGGKfffK...',
+  '.KffffKKffffK...',
+  '.KffffffffffK...',
+  '..KffffffffK....',
+  '...KffffffK.....',
+  '....KKKKKK......',
+  '................',
+]);
+A.decTotem = px(14, [
+  '..KKKKKKKKKK..',
+  '.KmmnmmmmnmmK.',
+  '.KmnemmmmenmK.',
+  '.KmmmmbmmmmmK.',
+  '.KMmmmmmmmmMK.',
+  '.KKKKKKKKKKKK.',
+  '.KttutttttutK.',
+  '.KteutttttetK.',
+  '.KttttbttttiK.',
+  '.KTtttttttTtK.',
+  '.KKKKKKKKKKKK.',
+  '..KwWwWwWwWK..',
+  '..KWwWwWwWwK..',
+  '..KKKKKKKKKK..',
+]);
+A.decLantern = px(12, [
+  '.....KK.....',
+  '....KwWK....',
+  '..KKKKKKKK..',
+  '.KrooooooK..',
+  'KroyyyyorK..',
+  'KroyyyyorK..',
+  'KroyyyyorK..',
+  '.KrooooooK..',
+  '..KKKKKKK...',
+  '....KwK.....',
+  '....KWK.....',
+  '...KKKKK....',
+]);
+A.decBanner = px(14, [
+  '.K............',
+  'KwK.KKKKKKKK..',
+  'KwK.KmmnnmmK..',
+  'KwWKKmnGGnmK..',
+  'KwK.KmGyyGmK..',
+  'KwK.KmnGGnmK..',
+  'KwWKKMmmmmMK..',
+  'KwK..KMmmMK...',
+  'KwK...KMMK....',
+  'KwWK...KK.....',
+  'KwK...........',
+  'KwWK..........',
+  'KKKK..........',
+  '..............',
+]);
+A.decCrystal = px(14, [
+  '......KK......',
+  '.....KccK.....',
+  '....KcCCcK....',
+  '....KcCCcK....',
+  '...KcCyyCcK...',
+  '...KcCyyCcK...',
+  '..KcCCCCCCcK..',
+  '..KcCCCCCCcK..',
+  '...KcCCCCcK...',
+  '....KcCCcK....',
+  '.....KccK.....',
+  '...KKKKKKKK...',
+  '..KZzzzzzzZK..',
+  '...KKKKKKKK...',
+]);
+A.decStarStone = px(14, [
+  '......K.......',
+  '.....KyK......',
+  '..K..KyK..K...',
+  '.KyKKKyKKKyK..',
+  '..KyyyGyyyK...',
+  '...KyGGGyK....',
+  '..KyyGGGyyK...',
+  '.KyKKGGGKKyK..',
+  '..K.KGGGK.K...',
+  '....KGGGK.....',
+  '...KKKKKKK....',
+  '..KzZZZZZzK...',
+  '..KZZZZZZZK...',
+  '...KKKKKKK....',
+]);
+A.decFlowerBed = px(16, [
+  '................',
+  '..K..K...K..K...',
+  '.KmK.KuK.KmK.K..',
+  'KmnmKKtuKKmnmKuK',
+  '.KmK.KuK.KmK.KtK',
+  '..KttKtKKtKttK..',
+  '.KtuttutttuttuK.',
+  'KwWwWwWwWwWwWwWK',
+  'KwwwwwwwwwwwwwwK',
+  'KWWWWWWWWWWWWWWK',
+  'KKKKKKKKKKKKKKKK',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+]);
+A.decIceArch = px(20, [
+  '....KKKKKKKK....',
+  '..KKcccccccc KK.',
+  '.KcCCCCCCCCCCcK.',
+  'KcCCcKKKKKKcCCcK',
+  'KcCcK......KcCcK',
+  'KcCcK......KcCcK',
+  'KcCcK......KcCcK',
+  'KcCcK......KcCcK',
+  'KcCcK......KcCcK',
+  'KcCcK......KcCcK',
+  'KcCcK......KcCcK',
+  'KCCcK......KcCCK',
+  'KZzZK......KZzZK',
+  'KKKKK......KKKKK',
+]);
+
+// ---------- 角色頭飾（疊在頭上）----------
+A.hatBeanie = px(14, [
+  '....KKKKKK....',
+  '...KmmnnmmK...',
+  '..KmnnnnnnmK..',
+  '..KMmmmmmmMK..',
+  '.KffffffffffK.',
+  '.KFFFFFFFFFFK.',
+  '..KKKKKKKKKK..',
+]);
+A.hatCrown = px(14, [
+  '.K...K...K....',
+  'KyK.KyK.KyK...',
+  'KGKKKGKKKGK...',
+  'KGGGGGGGGGK...',
+  'KGmGGmGGmGK...',
+  'KgggggggggK...',
+  'KKKKKKKKKKK...',
+]);
+A.hatAntler = px(16, [
+  '.K...........K..',
+  'KxK.......KxK...',
+  'KxKK.....KKxK...',
+  '.KxxK...KxxK....',
+  '..KxxK.KxxK.....',
+  '...KxxKxxK......',
+  '....KxxxK.......',
+  '...KbBBBbK......',
+  '...KKKKKKK......',
+]);
+A.hatWreath = px(14, [
+  '..KKKKKKKK....',
+  '.KtutuututK...',
+  'KtumtutumtuK..',
+  'KutututututK..',
+  'KtumtutumtuK..',
+  '.KtututtutK...',
+  '..KKKKKKKK....',
+]);
+A.hatExplorer = px(16, [
+  '....KKKKKK......',
+  '...KbBBBBbK.....',
+  '...KbmmmmbK.....',
+  '..KbBBBBBBbK....',
+  '.KbbbbbbbbbbK...',
+  'KbBBBBBBBBBBBK..',
+  '.KKKKKKKKKKKK...',
+]);
+
+export const DECOR_SPRITE = {
+  snowman: () => A.decSnowman, totem: () => A.decTotem,
+  lantern: () => A.decLantern, banner: () => A.decBanner,
+  crystal: () => A.decCrystal, starStone: () => A.decStarStone,
+  flowerBed: () => A.decFlowerBed, iceArch: () => A.decIceArch,
+};
+export const HAT_SPRITE = {
+  beanie: () => A.hatBeanie, crown: () => A.hatCrown,
+  antler: () => A.hatAntler, wreath: () => A.hatWreath,
+  explorer: () => A.hatExplorer,
+};
+
 export const BUILD_ICON = {
   shelf: A.icoShelf, counter: A.icoCounter, wall: A.icoWall,
-  tower: A.icoTower, hauler: A.icoHauler, hunter: A.icoHunter,
+  tower: A.icoTower, hauler: A.icoHauler, chopper: A.icoChopper,
+  hunter: A.icoHunter, robot: A.icoRobot,
 };
 export const WEAPON_SPRITE = {
   wpTorch: A.wpTorch, wpKnife: A.wpKnife, wpSpear: A.wpSpear,

@@ -14,7 +14,7 @@ export const CFG = {
   //  營地是唯一的據點，所有經營都在這裡發生
   CAMP:  { x: 236, y: 1200, w: 288, h: 300 },
   RESPAWN:  { x: 380, y: 1424 },
-  CAMPFIRE: { x: 380, y: 1400 },
+  CAMPFIRE: { x: 380, y: 1428 },
 
   // ---- 販賣區：玩家放肉上貨架 → 顧客排隊買走 → 現金堆在收銀台 → 玩家去收 ----
   SHELF: { x: 392, y: 1252, r: 26 },
@@ -59,26 +59,33 @@ export const CFG = {
   PAD_CHARGE: 1.5,          // 站上去要蓄力幾秒才升一級
 
   // 據點建設台（六個排成一列，剛好塞進 240 寬的畫面）
+  //  八個建設台排成兩排：上排是建築，下排是人力／機器
   BUILD_PADS: [
-    { key: 'shelf',   x: 280, y: 1340, r: 17 },
-    { key: 'counter', x: 320, y: 1340, r: 17 },
-    { key: 'wall',    x: 360, y: 1340, r: 17 },
-    { key: 'tower',   x: 400, y: 1340, r: 17 },
-    { key: 'hauler',  x: 440, y: 1340, r: 17 },
-    { key: 'hunter',  x: 480, y: 1340, r: 17 },
+    { key: 'shelf',   x: 308, y: 1322, r: 16 },
+    { key: 'counter', x: 356, y: 1322, r: 16 },
+    { key: 'wall',    x: 404, y: 1322, r: 16 },
+    { key: 'tower',   x: 452, y: 1322, r: 16 },
+    { key: 'hauler',  x: 308, y: 1376, r: 16 },
+    { key: 'chopper', x: 356, y: 1376, r: 16 },
+    { key: 'hunter',  x: 404, y: 1376, r: 16 },
+    { key: 'robot',   x: 452, y: 1376, r: 16 },
   ],
 
-  // 箭塔會蓋在這些位置（依等級依序啟用）
-  //  塔要蓋在畫面看得到的地方，否則玩家不知道自己買了什麼
-  TOWER_SPOTS: [
-    { x: 282, y: 1224 }, { x: 478, y: 1224 },
-    { x: 282, y: 1482 }, { x: 478, y: 1482 },
-  ],
+  //  箭塔預設位置：沿著營地外圍一圈自動排開（最多 20 座）。
+  //  玩家之後可以自己把塔扛去別的地方，這裡只是「買了就看得到」的初始佈局。
+  TOWER_SPOTS: (() => {
+    const cx = 380, cy = 1350, rx = 168, ry = 176, out = [];
+    for (let i = 0; i < 20; i++) {
+      const a = -Math.PI / 2 + (i / 20) * Math.PI * 2;
+      out.push({ x: Math.round(cx + Math.cos(a) * rx), y: Math.round(cy + Math.sin(a) * ry) });
+    }
+    return out;
+  })(),
 
   // 武器架（站上去蓄力購買下一階武器）
-  WEAPON_RACK: { x: 300, y: 1402, r: 20 },
+  WEAPON_RACK: { x: 292, y: 1428, r: 19 },
   // 遠征營帳（轉生）
-  PRESTIGE_PAD: { x: 460, y: 1402, r: 20 },
+  PRESTIGE_PAD: { x: 468, y: 1428, r: 19 },
 
   // ---- 玩家 ----
   PLAYER: {
@@ -185,30 +192,35 @@ export const CFG = {
   //  區域升級上限已移除 —— 玩家可以一路升到 max
   UPG: {
     cap:   { name: '背包容量', desc: '一次能扛多少肉',   unit: '格',
-             base: 8,  g: 1.18, start: 8,  per: 3,    max: 50, mode: 'add' },
+             base: 8,  g: 1.135, start: 8,  per: 3,    max: 50, mode: 'add' },
     speed: { name: '移動速度', desc: '跑得越快賺得越快', unit: '',
-             base: 12, g: 1.18, start: 86, per: 0.05, max: 50, mode: 'mul' },
+             base: 12, g: 1.135, start: 86, per: 0.05, max: 50, mode: 'mul' },
     power: { name: '武器威力', desc: '每次揮擊的傷害',   unit: '',
-             base: 10, g: 1.18, start: 4,  per: 0.11, max: 60, mode: 'mul' },
+             base: 10, g: 1.135, start: 4,  per: 0.11, max: 60, mode: 'mul' },
     //  血量上限：後期熊的傷害會漲到 30+，沒有這條線出門就是被三下打死
     vigor: { name: '體魄',     desc: '提高血量上限',     unit: '',
-             base: 16, g: 1.19, start: 100, per: 16, max: 50, mode: 'add' },
+             base: 16, g: 1.14, start: 100, per: 16, max: 50, mode: 'add' },
     warm:  { name: '保暖',     desc: '減少野外失溫扣血', unit: '',
-             base: 14, g: 1.18, start: 1,  per: 0.05, max: 50, mode: 'div' },
+             base: 14, g: 1.135, start: 1,  per: 0.05, max: 50, mode: 'div' },
   },
 
   // ---- 據點建設 ----
   //  每項有多個等級，逐級變強；效果全部「看得見」
   //  wood：升這一級需要的木材（× 目前等級＋1）。木造建築才吃木材，
   //  僱人不用。這讓砍樹在後期還有意義 —— 不然木頭賣的錢會被肉價完全輾過。
+  //  上限拉高很多之後，成長率必須跟著壓低 ——
+  //  2.2^19 是七百萬倍，20 座塔會變成天文數字。這裡的 g 都重算過，
+  //  讓「買滿」是一個看得到終點的目標，而不是數學上的笑話。
   BUILD: {
     //  貨架容量必須永遠大於背包容量，否則卸貨會卸不完，體感很差
-    shelf:   { name: '貨架',     desc: '能擺放的肉量',       base: 60,   g: 1.55, max: 8, start: 20, per: 14, wood: 5  },
-    counter: { name: '收銀台',   desc: '同時排隊的顧客數',   base: 140,  g: 1.85, max: 5, start: 3,  per: 1,  wood: 7  },
-    wall:    { name: '圍牆',     desc: '擴大營地安全範圍',   base: 260,  g: 2.10, max: 4, start: 0,  per: 18, wood: 12 },
-    tower:   { name: '箭塔',     desc: '自動射擊靠近的熊',   base: 600,  g: 2.20, max: 4, start: 0,  per: 1,  wood: 18 },
-    hauler:  { name: '搬運工',   desc: '自動把地上的肉送回', base: 800,  g: 2.30, max: 4, start: 0,  per: 1,  wood: 0  },
-    hunter:  { name: '獵人助手', desc: '自動獵殺野外的熊',   base: 2400, g: 2.45, max: 4, start: 0,  per: 1,  wood: 0  },
+    shelf:   { name: '貨架',     desc: '能擺放的肉量',       base: 60,   g: 1.38, max: 12, start: 20, per: 26, wood: 5  },
+    counter: { name: '收銀台',   desc: '同時排隊的顧客數',   base: 140,  g: 1.45, max: 8,  start: 3,  per: 1,  wood: 7  },
+    wall:    { name: '圍牆',     desc: '擴大營地安全範圍',   base: 260,  g: 1.62, max: 6,  start: 0,  per: 14, wood: 12 },
+    tower:   { name: '箭塔',     desc: '自動射擊靠近的熊',   base: 600,  g: 1.26, max: 20, start: 0,  per: 1,  wood: 10 },
+    hauler:  { name: '搬運工',   desc: '自動把地上的肉送回', base: 700,  g: 1.20, max: 25, start: 0,  per: 1,  wood: 4  },
+    chopper: { name: '伐木工',   desc: '自動砍樹並送回木材', base: 900,  g: 1.20, max: 25, start: 0,  per: 1,  wood: 4  },
+    hunter:  { name: '獵人助手', desc: '自動獵殺野外的熊',   base: 1800, g: 1.22, max: 25, start: 0,  per: 1,  wood: 0  },
+    robot:   { name: '收銀機器人', desc: '自動把收銀台的錢收走', base: 2600, g: 1.23, max: 25, start: 0, per: 1, wood: 6 },
   },
 
   //  木材庫存上限。滿了之後多的木頭會自動換成錢，不會浪費。
@@ -244,12 +256,66 @@ export const CFG = {
     },
   },
 
+  // ---- 幫手 ----
+  //  範圍拉得很大：據點在地圖南端，獵場在北邊，範圍小的話助手等於只在門口繞。
+  HELPER: {
+    haulRange: 1150,        // 搬運工／伐木工的搜尋半徑
+    huntRange: 1050,        // 獵人助手的搜尋半徑
+    haulSpd: 96,
+    huntSpd: 92,
+    chopSpd: 92,
+    //  助手傷害 = 玩家威力 × 這個比例。跟著武器升級一起變強。
+    hunterPower: 0.42,
+    chopperPower: 0.55,
+    robotSpd: 105,
+    robotCarry: 0.22,       // 機器人一趟搬走收銀台的幾成現金
+  },
+
+  // ---- 環繞武器 ----
+  //  武器分成三把繞著角色轉，每把獨立判定傷害。
+  ORBIT: { count: 3, radius: 26, speed: 2.6, hitCd: 0.42 },
+
   SELL_INTERVAL: 0.055,     // 玩家把肉放上貨架的速度
-  CASH_PICK: 0.045,         // 撿現金的速度
+  CASH_PICK: 0.014,         // 撿現金的速度（越小越快）
+  CASH_CHUNK: 8,            // 一次撿走現金堆的 1/8，堆越大撿越快
   FIRE_DRAIN: 54,           // $/s 流入火堆（要慢到有「儀式感」）
+
+  // ---- 商店：純外觀，不影響數值。錢在後期會過剩，這是它的去處 ----
+  //  style 只用來在商店裡分組，讓玩家挑得到自己喜歡的調性。
+  SHOP: {
+    decor: [
+      { id: 'snowman',   name: '雪人',     cost: 1500,   style: '極地', x: 268, y: 1236 },
+      { id: 'totem',     name: '圖騰柱',   cost: 6000,   style: '極地', x: 496, y: 1236 },
+      { id: 'flowerBed', name: '冰原花圃', cost: 24000,  style: '極地', x: 268, y: 1480 },
+      { id: 'lantern',   name: '暖光燈籠', cost: 9000,   style: '節慶', x: 336, y: 1244 },
+      { id: 'banner',    name: '獵團旗幟', cost: 38000,  style: '節慶', x: 436, y: 1236 },
+      { id: 'crystal',   name: '極光水晶', cost: 120000, style: '奇幻', x: 496, y: 1480 },
+      { id: 'starStone', name: '星屑石',   cost: 320000, style: '奇幻', x: 380, y: 1214 },
+      { id: 'iceArch',   name: '冰晶拱門', cost: 900000, style: '奇幻', x: 380, y: 1496 },
+    ],
+    hat: [
+      { id: 'beanie',   name: '毛線帽',   cost: 800,    style: '極地' },
+      { id: 'explorer', name: '探險帽',   cost: 12000,  style: '極地' },
+      { id: 'wreath',   name: '常青花環', cost: 45000,  style: '節慶' },
+      { id: 'antler',   name: '馴鹿角',   cost: 160000, style: '節慶' },
+      { id: 'crown',    name: '極光王冠', cost: 750000, style: '奇幻' },
+    ],
+    //  助手制服：整支隊伍換色，一眼看得出是「我的隊伍」
+    crew: [
+      { id: 'none',   name: '原色',     cost: 0,      style: '極地', tint: null },
+      { id: 'frost',  name: '霜藍制服', cost: 5000,   style: '極地', tint: '#74aae8' },
+      { id: 'ember',  name: '暖火制服', cost: 26000,  style: '節慶', tint: '#ff9f5a' },
+      { id: 'jade',   name: '翠玉制服', cost: 90000,  style: '節慶', tint: '#4aa863' },
+      { id: 'aurora', name: '極光制服', cost: 400000, style: '奇幻', tint: '#9fdff0' },
+      { id: 'royal',  name: '御用金裝', cost: 1500000, style: '奇幻', tint: '#ffd651' },
+    ],
+  },
 
   SAVE_KEY: 'frostline_save',
   SAVE_VERSION: 3,
+  //  能相容讀取的最舊版本。新增欄位不需要動版本號 ——
+  //  缺的鍵會用預設值補齊，玩家的進度不會因為更新而被清掉。
+  SAVE_MIN: 3,
 };
 
 /** 木材掉落物的標記值（與肉塊區分） */

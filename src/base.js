@@ -5,7 +5,10 @@
 import { CFG, buildValue, WOOD_MARKER } from './config.js';
 import { world, inCamp, campRect, setCampExpand } from './world.js';
 import { SFX } from './audio.js';
-import { G, val, burst, float, coinFly, killBear, rng, depositWood } from './game.js';
+import { abbr } from './pixel.js';
+import {
+  G, val, burst, float, coinFly, killBear, rng, depositWood, damageTree, earn,
+} from './game.js';
 
 // ---------------- 貨架 ----------------
 export function shelfSpace() { return Math.max(0, val.shelfMax() - G.shelf.length); }
@@ -27,11 +30,11 @@ export function initBase() {
   G.towerGrab = 0; G.towerPlace = 0;
 
   // 幫手
-  const want = { hauler: G.build.hauler, hunter: G.build.hunter };
+  const KINDS = ['hauler', 'chopper', 'hunter', 'robot'];
   const keep = [];
-  for (const kind of ['hauler', 'hunter']) {
+  for (const kind of KINDS) {
     const have = G.helpers.filter(h => h.kind === kind);
-    for (let i = 0; i < want[kind]; i++) {
+    for (let i = 0; i < (G.build[kind] || 0); i++) {
       keep.push(have[i] || makeHelper(kind, i));
     }
   }
@@ -74,6 +77,7 @@ function makeHelper(kind, i) {
     vx: 0, vy: 0, face: 1, walkT: 0,
     state: 'idle', target: null, carry: [], atkT: 0,
     mode: 'gather', dropT: 0,
+    tree: null, load: 0, swing: 0,
   };
 }
 
@@ -236,11 +240,106 @@ function updateHelpers(dt) {
   for (const h of G.helpers) {
     h.walkT += dt * 7;
     if (h.kind === 'hauler') updateHauler(h, dt, campCx, campCy);
+    else if (h.kind === 'chopper') updateChopper(h, dt, campCx, campCy);
+    else if (h.kind === 'robot') updateRobot(h, dt, campCx, campCy);
     else updateHunter(h, dt, campCx, campCy);
   }
 }
 
-const HAULER_RANGE = 420;
+// ---------------- 伐木工：砍樹 → 把木材送回木材場 ----------------
+//  傷害跟著玩家的武器威力走，所以升級「武器威力」也等於升級整支伐木隊。
+function updateChopper(h, dt, cx, cy) {
+  const H = CFG.HELPER;
+
+  // 背滿了就送回木材場
+  if (h.carry.length >= haulerCarry()) {
+    const arrived = moveTo(h, CFG.WOOD.x, CFG.WOOD.y + 16, H.chopSpd, dt);
+    if (arrived || Math.hypot(h.x - CFG.WOOD.x, h.y - CFG.WOOD.y) < 22) {
+      h.dropT = Math.max(-0.08, (h.dropT || 0) - dt);
+      while (h.dropT <= 0 && h.carry.length > 0) {
+        h.dropT += 0.08;
+        h.carry.pop();
+        depositWood(CFG.WOOD.x, CFG.WOOD.y);
+      }
+    }
+    return;
+  }
+
+  // 找一棵活著的樹
+  if (!h.tree || h.tree.deadT > 0 || h.tree.hp <= 0) {
+    h.tree = null;
+    let bd = H.haulRange;
+    for (const pr of world.props) {
+      if (pr.kind !== 'tree' || pr.deadT > 0 || pr.hp <= 0) continue;
+      if (pr.owner && pr.owner !== h) continue;
+      if (Math.hypot(pr.x - cx, pr.y - cy) > H.haulRange) continue;
+      const d = Math.hypot(pr.x - h.x, pr.y - h.y);
+      if (d < bd) { bd = d; h.tree = pr; }
+    }
+    if (h.tree) h.tree.owner = h;
+  }
+  if (!h.tree) {
+    // 沒樹可砍就先把身上的送回去，不然會站著發呆
+    if (h.carry.length > 0) { h.carry.length = Math.min(h.carry.length, haulerCarry()); h.carry.push(WOOD_MARKER); h.carry.pop(); }
+    moveTo(h, cx - 60, cy + 30, 40, dt);
+    return;
+  }
+
+  const d = Math.hypot(h.x - h.tree.x, h.y - h.tree.y);
+  if (d > 14) { moveTo(h, h.tree.x, h.tree.y + 6, H.chopSpd, dt); return; }
+  h.vx = h.vy = 0;
+
+  h.atkT -= dt;
+  if (h.atkT <= 0) {
+    h.atkT = 0.55;
+    h.swing = 0.2;
+    const before = G.drops.length;
+    const felled = damageTree(h.tree, val.power() * CFG.HELPER.chopperPower * (1 + h.i * 0.08));
+    if (felled) {
+      // 樹倒了：把剛掉出來的木頭直接收進背包，省得再走一趟
+      h.tree.owner = null;
+      h.tree = null;
+      for (let i = G.drops.length - 1; i >= before; i--) {
+        if (h.carry.length >= haulerCarry()) break;
+        if (G.drops[i].value !== WOOD_MARKER) continue;
+        h.carry.push(WOOD_MARKER);
+        G.drops.splice(i, 1);
+      }
+    }
+  }
+  if (h.swing > 0) h.swing -= dt;
+}
+
+// ---------------- 收銀機器人：自動把收銀台的現金收進口袋 ----------------
+function updateRobot(h, dt, cx, cy) {
+  const H = CFG.HELPER;
+  const cash = CFG.CASH;
+
+  if (h.load > 0) {
+    // 載滿了送去「入帳」（走到營火旁邊當作回報點）
+    const t = CFG.CAMPFIRE;
+    const arrived = moveTo(h, t.x, t.y + 14, H.robotSpd, dt);
+    if (arrived || Math.hypot(h.x - t.x, h.y - t.y) < 20) {
+      earn(h.load);
+      float(h.x, h.y - 26, '+$' + abbr(Math.round(h.load)), '#ffd651');
+      coinFly(h.x, h.y - 14, t.x, t.y - 10, 'coin');
+      SFX.sell(2);
+      h.load = 0;
+    }
+    return;
+  }
+
+  if (G.cash <= 0) { moveTo(h, cx + 60, cy + 30, 40, dt); return; }
+  const arrived = moveTo(h, cash.x, cash.y + 14, H.robotSpd, dt);
+  if (arrived || Math.hypot(h.x - cash.x, h.y - cash.y) < 20) {
+    const take = Math.min(G.cash, Math.max(1, G.cash * H.robotCarry));
+    G.cash -= take;
+    h.load = take;
+    coinFly(cash.x, cash.y - 8, h.x, h.y - 14, 'bill');
+  }
+}
+
+const HAULER_RANGE = CFG.HELPER.haulRange;
 /** 搬運工的載重跟著玩家的背包一起長，後期才不會變成一次搬五塊的雞肋 */
 function haulerCarry() { return Math.max(4, Math.round(val.cap() * 0.5)); }
 
@@ -318,7 +417,7 @@ function updateHauler(h, dt, cx, cy) {
   }
 }
 
-const HUNTER_RANGE = 380;
+const HUNTER_RANGE = CFG.HELPER.huntRange;
 
 function updateHunter(h, dt, cx, cy) {
   h.atkT -= dt;
@@ -341,7 +440,7 @@ function updateHunter(h, dt, cx, cy) {
   if (h.atkT <= 0) {
     h.atkT = 0.75;
     h.swing = 0.2;
-    const dmg = val.power() * 0.4 * (1 + h.i * 0.25);
+    const dmg = val.power() * CFG.HELPER.hunterPower * (1 + h.i * 0.06);
     h.target.hp -= dmg;
     h.target.flash = 0.12;
     float(h.target.x, h.target.y - 18, '-' + Math.round(dmg), '#a0e8a0');

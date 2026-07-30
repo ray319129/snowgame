@@ -3,11 +3,14 @@
 //  所有繪製座標一律 round，保持像素對齊
 // ============================================================
 import { CFG, buildValue, WOOD_MARKER } from './config.js';
-import { ART, BEAR_SPRITES, BUILD_ICON, WEAPON_SPRITE } from './art.js';
-import { px, flipX, drawText, drawTextC, textWidth, abbr } from './pixel.js';
+import {
+  ART, BEAR_SPRITES, BUILD_ICON, WEAPON_SPRITE, DECOR_SPRITE, HAT_SPRITE,
+} from './art.js';
+import { px, flipX, tint, drawText, drawTextC, textWidth, abbr } from './pixel.js';
 import { world, PROP_SPRITE, inCamp, campRect, makeRng } from './world.js';
 import {
   G, val, nextCost, nextBuildCost, nextBuildWood, nextWeapon, pendingMarks, countWood,
+  orbitRadius,
 } from './game.js';
 import { input } from './input.js';
 
@@ -185,6 +188,10 @@ export function render(dt) {
     list.push({ y: pl.den.y, k: 'den', o: pl });
   }
   for (const f of world.firepits) list.push({ y: f.y, k: 'fire', o: f });
+  // 買下的裝飾品：跟其他物件一起參與 y 排序，才會正確被前後遮擋
+  for (const d of CFG.SHOP.decor) {
+    if (G.owned.decor.includes(d.id)) list.push({ y: d.y, k: 'decor', o: d });
+  }
 
   // 據點設施
   list.push({ y: CFG.SHELF.y + 10, k: 'shelf', o: CFG.SHELF });
@@ -209,6 +216,7 @@ export function render(dt) {
   const DRAW = {
     den: drawDen,
     prop: drawProp, fire: drawFirepit, shelf: drawShelf, wood: drawWoodYard,
+    decor: drawDecor,
     cash: drawCash, campfire: drawCampfire, rack: drawRack, prestige: drawPrestige,
     pad: drawPad, bpad: drawBuildPad, tower: drawTower, meat: drawMeat,
     bear: drawBear, cust: drawCustomer, helper: drawHelper, player: drawPlayer,
@@ -417,6 +425,28 @@ function drawCash(cz) {
     { maxW: 7, narrow: 0.3, colW: 6.2, rowH: 3.4, sway: 0.35, phase: 1.3 },
   );
   drawTextC(ctx, '$' + abbr(G.cash), S(cz.x), SY(cz.y - 2 - rows * 3.6) - 11, '#ffe08a');
+}
+
+//  裝飾品：奇幻風的會自己發光，讓高價位看得出價值
+function drawDecor(d) {
+  const s = DECOR_SPRITE[d.id]();
+  shadow(d.x, d.y - 1, s.width * 0.34, 3.5, 0.24);
+  const bob = d.style === '奇幻' ? Math.round(Math.sin(G.time * 1.6 + d.x) * 1) : 0;
+  spr(s, d.x, d.y + bob);
+  if (d.style === '奇幻' || d.id === 'lantern') {
+    const fl = 0.75 + Math.sin(G.time * 3 + d.x) * 0.25;
+    const col = d.id === 'lantern' ? '255,170,60' : '150,230,255';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const r = 26;
+    const gr = ctx.createRadialGradient(S(d.x), SY(d.y) - s.height * 0.5, 0,
+                                        S(d.x), SY(d.y) - s.height * 0.5, r);
+    gr.addColorStop(0, `rgba(${col},${0.3 * fl})`);
+    gr.addColorStop(1, `rgba(${col},0)`);
+    ctx.fillStyle = gr;
+    ctx.fillRect(S(d.x) - r, SY(d.y) - s.height * 0.5 - r, r * 2, r * 2);
+    ctx.restore();
+  }
 }
 
 // ---- 木材場：跟肉完全分開的第二條產線 ----
@@ -631,8 +661,25 @@ function drawCustomer(c) {
   }
 }
 
+const HELPER_SPRITE = {
+  hauler: () => ART.hauler, chopper: () => ART.chopperMan,
+  hunter: () => ART.helperHunter, robot: () => ART.robotUnit,
+};
+
+//  助手制服：整支隊伍統一染色。染色結果有快取，不會每幀重畫。
+const crewCache = new Map();
+function crewSkin(base, crewId) {
+  const item = CFG.SHOP.crew.find(c => c.id === crewId);
+  if (!item || !item.tint) return base;
+  const key = crewId + '|' + base.width + 'x' + base.height + '|' + (base.__id || (base.__id = ++crewCache.seq0));
+  let out = crewCache.get(key);
+  if (!out) { out = tint(base, item.tint, 0.42); crewCache.set(key, out); }
+  return out;
+}
+crewCache.seq0 = 0;
+
 function drawHelper(h) {
-  const s0 = h.kind === 'hauler' ? ART.hauler : ART.helperHunter;
+  const s0 = crewSkin((HELPER_SPRITE[h.kind] || HELPER_SPRITE.hauler)(), G.equip.crew);
   const s = h.face > 0 ? s0 : L(s0);
   const moving = Math.abs(h.vx) + Math.abs(h.vy) > 2;
   shadow(h.x, h.y - 1, 6, 3, 0.26);
@@ -696,35 +743,49 @@ function drawPlayer(p) {
   if (p.face < 0) s = L(s);
 
   const py = p.y + (moving ? -Math.round(Math.abs(Math.sin(p.walkT * 1.6))) : 0);
-  spr(s, p.x, py, alpha);
 
-  // ---- 武器 ----
+  // ---- 三把環繞武器 ----
+  //  後面半圈（sin < 0）先畫，前面半圈之後再畫，才有繞著身體轉的立體感。
   const w = val.weapon();
   const frames = WEAPON_SPRITE[w.sprite];
   const wf = frames[frames.length > 1 ? Math.floor(G.time * 12) % frames.length : 0];
-  let tox = p.face * 7, toy = -9;
-  if (p.swing > 0) {
-    const t = 1 - p.swing / (p.swingMax || 0.22);
-    const a = p.swingDir + (1 - t * 2) * (w.arc / 2);
-    tox = Math.cos(a) * (w.range * 0.45);
-    toy = -9 + Math.sin(a) * (w.range * 0.32);
-  }
-  spr(wf, p.x + tox, py + toy + wf.height, alpha);
+  const R = orbitRadius();
 
-  // ---- 揮擊弧線 ----
-  if (p.swing > 0) {
-    const t = 1 - p.swing / (p.swingMax || 0.22);
-    const a0 = p.swingDir + w.arc / 2, a1 = p.swingDir - w.arc / 2;
-    const a = a0 + (a1 - a0) * t;
+  // 軌跡環
+  ctx.save();
+  ctx.globalAlpha = 0.13 * alpha;
+  ctx.strokeStyle = w.color; ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(S(p.x), SY(py) - 8, R, R * 0.62, 0, 0, 7);
+  ctx.stroke();
+  ctx.restore();
+
+  const blade = (i, front) => {
+    const a = p.orbit + (i / CFG.ORBIT.count) * Math.PI * 2;
+    const sa = Math.sin(a);
+    if ((sa >= 0) !== front) return;
+    const bx = p.x + Math.cos(a) * R;
+    const by = py - 8 + sa * R * 0.62;
+    // 冷卻中的刀稍微變暗，玩家看得出「這把剛打過」
+    const cool = p.blades[i].cd > 0 ? 0.55 : 1;
     ctx.save();
-    ctx.globalAlpha = (1 - t) * 0.85;
-    ctx.strokeStyle = w.color; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(S(p.x), SY(py) - 8, w.range - 4, a - 0.5, a + 0.15); ctx.stroke();
-    ctx.globalAlpha = (1 - t) * 0.45;
-    ctx.strokeStyle = '#fff6d0'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.arc(S(p.x), SY(py) - 8, w.range - 1, a - 0.4, a + 0.1); ctx.stroke();
+    ctx.globalAlpha = alpha * cool * 0.9;
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = w.color;
+    ctx.beginPath();
+    ctx.ellipse(S(bx), SY(by), 5, 4, 0, 0, 7);
+    ctx.fill();
     ctx.restore();
+    spr(wf, bx, by + wf.height / 2, alpha * cool);
+  };
+  for (let i = 0; i < CFG.ORBIT.count; i++) blade(i, false);   // 身後
+  spr(s, p.x, py, alpha);                                       // 角色蓋在中間
+  //  頭飾疊在頭頂（角色高 21px，帽子壓在最上緣）
+  if (G.equip.hat && HAT_SPRITE[G.equip.hat]) {
+    const hat = HAT_SPRITE[G.equip.hat]();
+    spr(p.face < 0 ? L(hat) : hat, p.x, py - 17, alpha);
   }
+  for (let i = 0; i < CFG.ORBIT.count; i++) blade(i, true);     // 身前
 
   // ---- 背上的肉堆（財富可視化）----
   //  堆得越高越爽。跑動時整座塔會左右擺動，越上面晃越大。

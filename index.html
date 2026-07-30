@@ -180,6 +180,49 @@
   }
   #resetBtn.can{border-color:#ffd651;animation:blink 1.3s infinite}
   #resetBtn.no{opacity:.4}
+  /* ---------- 裝飾商店 ---------- */
+  #shopBtn{
+    position:absolute;right:9px;bottom:26px;pointer-events:auto;cursor:pointer;
+    font-size:11px;font-weight:800;letter-spacing:1px;color:#ffd651;
+    background:linear-gradient(#2a2038,#1a1426);
+    border:2px solid #7a5a9a;border-radius:3px;padding:6px 10px;
+    box-shadow:0 3px 0 #0c1020;
+  }
+  #shopBtn:active{transform:translateY(2px);box-shadow:0 1px 0 #0c1020}
+  #shop{
+    position:absolute;inset:0;background:rgba(6,9,17,.94);
+    display:none;flex-direction:column;padding:12px 12px 10px;pointer-events:auto;overflow-y:auto;
+  }
+  #shop.on{display:flex}
+  #shop h3{font-size:13px;letter-spacing:3px;color:#ffd651;text-align:center;font-weight:900}
+  #shop .sub{font-size:10px;color:#8c9ab5;text-align:center;margin:3px 0 8px}
+  #shop .sub b{color:#8fe8a0}
+  #shopTabs{display:flex;gap:4px;margin-bottom:8px}
+  #shopTabs span{
+    flex:1;text-align:center;padding:6px 0;cursor:pointer;border-radius:3px;
+    font-size:11px;font-weight:800;letter-spacing:1px;
+    background:#161d2c;border:2px solid #38445e;color:#8c9ab5;
+  }
+  #shopTabs span.on{border-color:#ffd651;color:#ffd651;background:#241d10}
+  .styleHd{font-size:9px;font-weight:800;letter-spacing:2px;color:#7a8298;margin:6px 0 3px}
+  .sItem{
+    display:flex;align-items:center;gap:8px;
+    background:#161d2c;border:2px solid #38445e;border-radius:3px;
+    padding:6px 8px;margin-bottom:4px;cursor:pointer;
+  }
+  .sItem.own{border-color:#4a7a5a;background:#141f19}
+  .sItem.on{border-color:#ffd651;background:#241d10}
+  .sItem.no{opacity:.45}
+  .sItem canvas{image-rendering:pixelated;flex:none;width:30px;height:30px;object-fit:contain}
+  .sItem .nm{flex:1;font-size:12px;font-weight:800;color:#e8eef7}
+  .sItem .nm em{display:block;font-style:normal;font-size:9px;color:#8c9ab5;margin-top:1px}
+  .sItem .pc{font-size:11px;font-weight:900;color:#ffd651;text-align:right}
+  .sItem.own .pc{color:#8fe8a0}
+  #shopClose{
+    margin-top:6px;padding:9px;text-align:center;font-size:11px;letter-spacing:2px;
+    color:#8c9ab5;border:2px solid #38445e;border-radius:3px;cursor:pointer;
+  }
+
   #modalClose{
     margin-top:4px;padding:8px;text-align:center;font-size:11px;letter-spacing:2px;
     color:#8c9ab5;border:2px solid #38445e;border-radius:3px;cursor:pointer;
@@ -204,6 +247,18 @@
       </div>
     </div>
     <div id="zone">冰原邊緣<em>ZONE 1</em></div>
+    <div id="shopBtn">🛍 商店</div>
+    <div id="shop">
+      <h3>裝 飾 商 店</h3>
+      <div class="sub">純外觀，不影響數值。<b>轉生不會失去</b>。</div>
+      <div id="shopTabs">
+        <span data-cat="decor" class="on">據點</span>
+        <span data-cat="hat">角色</span>
+        <span data-cat="crew">助手</span>
+      </div>
+      <div id="shopList"></div>
+      <div id="shopClose">關閉</div>
+    </div>
     <div id="saveDot">已存檔</div>
     <div id="toasts"></div>
     <div id="panel">

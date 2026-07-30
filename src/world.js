@@ -56,7 +56,7 @@ function maxCamp() {
 }
 
 //  spacing 刻意調小 —— 樹要能長成一片林子，不是均勻散點
-function blocked(x, y, spacing = 12) {
+function blocked(x, y, spacing = 9) {
   const c = maxCamp();
   if (x > c.x - 30 && x < c.x + c.w + 30 && y > c.y - 30 && y < c.y + c.h + 30) return true;
   for (const f of CFG.FIREPITS) if (Math.hypot(x - f.x, y - f.y) < 62) return true;
@@ -142,13 +142,13 @@ export function buildWorld() {
     world.props.push({ x: Math.round(x), y: Math.round(y), kind, hp, maxHp: hp, deadT: 0 });
   };
 
-  // 樹叢
-  for (let i = 0; i < 380; i++) {
+  // 樹叢：密密麻麻的林子。樹是資源（伐木工要砍），密度就是產能。
+  for (let i = 0; i < 900; i++) {
     const cx = 16 + propRng() * (W - 32);
     const cy = 40 + propRng() * (H - 90);
-    const n = 3 + Math.floor(propRng() * 5);
+    const n = 4 + Math.floor(propRng() * 6);
     for (let j = 0; j < n; j++) {
-      addProp(cx + (propRng() - 0.5) * 72, cy + (propRng() - 0.5) * 62, 'tree');
+      addProp(cx + (propRng() - 0.5) * 62, cy + (propRng() - 0.5) * 54, 'tree');
     }
   }
   // 零星石頭與冰晶
